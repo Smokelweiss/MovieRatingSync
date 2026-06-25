@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie Ratings Sync
 // @namespace    movie-ratings-sync
-// @version      11.0
+// @version      1.0
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @author       Smokelweiss
 // @match        https://www.kinopoisk.ru/*
