@@ -1,4 +1,4 @@
-# Movie Ratings Sync
+# Movie Rating Sync
 
 Синхронизация оценок фильмов между [Кинопоиском](https://www.kinopoisk.ru/), [IMDb](https://www.imdb.com/) и другими сервисами.
 
