@@ -1,0 +1,14 @@
+# User-specific files
+*.user
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
