@@ -40,7 +40,7 @@
 
 ---
 
-# Movie Ratings Sync
+# Movie Rating Sync
 
 Sync movie ratings across [Kinopoisk](https://www.kinopoisk.ru/), [IMDb](https://www.imdb.com/) and more.
 
