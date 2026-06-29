@@ -1,0 +1,74 @@
+name: Publish to Firefox AMO
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'movie-rating-sync.user.js'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Extract version from userscript
+        id: version
+        run: |
+          VER=$(grep -m1 '// @version' movie-rating-sync.user.js | sed -E 's/.*@version\s+([0-9.]+).*/\1/')
+          echo "version=$VER" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VER"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git tag -l "$TAG" | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag $TAG already exists — skipping"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "New version: $TAG"
+          fi
+
+      - name: Update manifest versions
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VER\"/" extension/manifest.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VER\"/" extension/manifest.firefox.json
+          echo "Updated manifests to version $VER"
+
+      - name: Package extension (Firefox build)
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          mkdir -p _ffbuild/icons
+          cp extension/content.js _ffbuild/
+          cp extension/manifest.firefox.json _ffbuild/manifest.json
+          cp extension/icons/*.png _ffbuild/icons/
+          cd _ffbuild
+          zip -r ../movie-ratings-sync.zip .
+          cd ..
+          rm -rf _ffbuild
+          echo "Created movie-ratings-sync.zip"
+
+      - name: Publish to Firefox AMO
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: wdzeng/firefox-addon@v1
+        with:
+          addon-id: movie-ratings-sync@smokelweiss
+          jwt-issuer: ${{ secrets.AMO_JWT_ISSUER }}
+          jwt-secret: ${{ secrets.AMO_JWT_SECRET }}
+          path: movie-ratings-sync.zip
+
+      - name: Create GitHub Release and Tag
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: movie-ratings-sync.zip
+          generate_release_notes: true

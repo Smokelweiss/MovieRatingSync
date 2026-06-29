@@ -12,3 +12,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Build artifacts
+*.zip
+_*/
