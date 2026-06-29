@@ -139,6 +139,25 @@
 
     const setStatus = (el, text) => { if (!el) return; el.style.display = 'block'; el.textContent = text; };
 
+    function renderResult(el, title, pairs, done) {
+        el.textContent = '';
+        const tb = document.createElement('b');
+        tb.textContent = title;
+        el.appendChild(tb);
+        for (const [l, v] of pairs) {
+            el.appendChild(document.createElement('br'));
+            el.appendChild(document.createTextNode(l));
+            const vb = document.createElement('b');
+            vb.textContent = String(v);
+            el.appendChild(vb);
+        }
+        if (done) {
+            el.appendChild(document.createElement('br'));
+            el.appendChild(document.createElement('br'));
+            el.appendChild(document.createTextNode(done));
+        }
+    }
+
     // ====================== CSV ======================
 
     const csvEsc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
@@ -743,8 +762,13 @@
         const elapsed = Math.round((Date.now() - t0) / 1000);
         const lbl = mode === 'replace' ? ' (режим замены)' : '';
         if (result.missed.length) downloadCSV(buildCSV(result.missed), 'kp_missed.csv');
-        statusEl.textContent = '';
-        statusEl.insertAdjacentHTML('beforeend', `✅ <b>Готово${lbl} (${elapsed} сек)!</b><br>Оценено: <b>${result.rated}</b><br>Отмечено: <b>${result.watched}</b><br>Пропущено: <b>${result.skipped}</b><br>Не найдено: <b>${result.notFound}</b><br>Ошибок: <b>${result.failed}</b>${result.notFound === 0 && result.failed === 0 ? '<br><br>🎉 Все записи импортированы!' : ''}`);
+        renderResult(statusEl, `✅ Готово${lbl} (${elapsed} сек)!`, [
+            ['Оценено: ', result.rated],
+            ['Отмечено: ', result.watched],
+            ['Пропущено: ', result.skipped],
+            ['Не найдено: ', result.notFound],
+            ['Ошибок: ', result.failed],
+        ], result.notFound === 0 && result.failed === 0 ? '🎉 Все записи импортированы!' : null);
     }
 
     // ====================== IMDb MODULE ======================
@@ -952,11 +976,13 @@
 
     function renderIMDbResult(result, statusEl, rated, watched, mode) {
         const lbl = mode === 'replace' ? ' (режим замены)' : '';
-        statusEl.textContent = '';
-        statusEl.insertAdjacentHTML('beforeend', `✅ <b>Готово${lbl}!</b><br>Оценено: <b>${result.rated}</b><br>Просмотрено: <b>${result.watched}</b><br>Пропущено: <b>${result.skipped}</b><br>Не найдено: <b>${result.notFound}</b><br>Ошибок: <b>${result.failed}</b>`);
-        if (!result.notFound && !result.failed) {
-            statusEl.insertAdjacentHTML('beforeend', '<br><br>🎉 Все записи импортированы!');
-        }
+        renderResult(statusEl, `✅ Готово${lbl}!`, [
+            ['Оценено: ', result.rated],
+            ['Просмотрено: ', result.watched],
+            ['Пропущено: ', result.skipped],
+            ['Не найдено: ', result.notFound],
+            ['Ошибок: ', result.failed],
+        ], result.notFound === 0 && result.failed === 0 ? '🎉 Все записи импортированы!' : null);
         if (result.missed.length) {
             downloadCSV(buildCSV(result.missed), 'imdb_missed.csv');
             const btn = Object.assign(document.createElement('button'), {
@@ -969,9 +995,9 @@
                 const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode);
                 renderIMDbResult(r2, statusEl, rated, watched, mode);
             });
-            statusEl.insertAdjacentElement('beforeend', document.createElement('br'));
-            statusEl.insertAdjacentElement('beforeend', document.createElement('br'));
-            statusEl.insertAdjacentElement('beforeend', btn);
+            statusEl.appendChild(document.createElement('br'));
+            statusEl.appendChild(document.createElement('br'));
+            statusEl.appendChild(btn);
         }
     }
 
@@ -1500,8 +1526,12 @@
 
         if (missed.length) downloadCSV(buildCSV(missed), 'lb_missed.csv');
         console.log(`[mrs] LB APPLY DONE: rated=${rated} watched=${watched} failed=${failed} toApply=${toApply.length}`);
-        statusEl.textContent = '';
-        statusEl.insertAdjacentHTML('beforeend', `✅ <b>Готово!</b><br>Оценено: <b>${rated}</b><br>Просмотрено: <b>${watched}</b><br>Не найдено: <b>${notFound}</b><br>Ошибок: <b>${failed}</b>${!notFound && !failed ? '<br><br>🎉 Все записи импортированы!' : ''}`);
+        renderResult(statusEl, '✅ Готово!', [
+            ['Оценено: ', rated],
+            ['Просмотрено: ', watched],
+            ['Не найдено: ', notFound],
+            ['Ошибок: ', failed],
+        ], !notFound && !failed ? '🎉 Все записи импортированы!' : null);
     }
 
     // ====================== MODULE REGISTRY ======================
