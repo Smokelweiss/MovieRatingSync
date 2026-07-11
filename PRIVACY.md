@@ -1,10 +1,10 @@
-# Privacy Policy for Movie Ratings Sync
+# Privacy Policy for Movie Rating Sync
 
 **Last updated:** June 29, 2026
 
 ## What this extension does
 
-Movie Ratings Sync is a browser extension that helps you export and import movie ratings between Kinopoisk, IMDb, and Letterboxd.
+Movie Rating Sync is a browser extension that helps you export and import movie ratings between Kinopoisk, IMDb, and Letterboxd.
 
 ## Data collection
 

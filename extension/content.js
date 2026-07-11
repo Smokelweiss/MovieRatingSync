@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    const DEBUG = false;
+
     // ====================== CONSTANTS ======================
 
     const SITE = {
@@ -10,17 +12,101 @@
     };
 
     const DELAY = {
-        KP_INIT: 100, GQL_INIT: 50,
-        KP_MIN_FAST: 10, KP_MIN_SLOW: 20, KP_MAX: 3000, GQL_MAX: 3000,
-        PAGE_BETWEEN: 30, HISTORY_PAGE: 300,
+        KP_INIT: 100, GQL_INIT: 30,
+        KP_MIN_FAST: 10, KP_MIN_SLOW: 20, KP_MAX: 3000,
+        PAGE_BETWEEN: 15, HISTORY_PAGE: 25,
         F_FAST: 0.70, F_MID: 0.85, F_SLOW: 1.05, F_429: 2.00, F_ERR: 1.30,
     };
 
-    const CONCURRENCY = { INIT: 20, MAX: 200, UP: 10, DOWN: 5, STREAK: 3 };
+    const CONCURRENCY = { INIT: 20, MAX: 200, UP: 10, DOWN: 5, MIN: 5 };
     const PLATFORM_MAX = { kp: 50, kpGql: 50, imdb: 200, lb: 50 };
-    const RETRY = { FETCH: 4, GQL: 3, PAGES: 100 };
+    const RETRY = { FETCH: 3, GQL: 3, PAGES: 100 };
     const YEAR_TOL = 1;
     const KP_GQL = 'https://graphql.kinopoisk.ru/graphql/';
+
+    // ====================== I18N ======================
+
+const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',importRatings: '📥 Import',hardImport: '🔄 Hard Import',loadingPage: 'Loading page {p}{total} ({count} movies)',kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed',kpListingFailed: 'Failed to load Kinopoisk listing',profileDetect: 'Detecting {platform} profile',loadedRecords: 'Loaded {count} records. {next}',checkingExisting: 'Checking existing ratings...',startingImport: 'Starting import...',importProgress: 'Import to {platform} {from}–{to}/{total}',searchProgress: 'Search {from}–{to}/{total}',resolveProgress: 'Resolving {from}–{to}/{total}',resolveIdCount: 'Resolving IDs: {count} movies',fetchingLid: 'Fetching LID: {count} movies',applyProgress: 'Applying {from}–{to}/{total}',loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)',deepSearch: 'Deep search {platform}',scanHistory: 'Scanning {platform} history',foundCount: 'Found: {count} movies. Generating CSV',userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped',ratings: 'Ratings',watchHistory: 'Watch history',diary: 'Diary',watched: 'Watched',page: 'page',kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page',imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account',lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile',csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account',csvEmpty: '❌ CSV is empty or not recognized',done: '✅ Done{mode}!',replaceMode: ' (replace mode)',rated: 'Rated: ',watchedShort: 'Watched: ',skipped: 'Skipped: ',notFound: 'Not found: ',failed: 'Errors: ',errorNotFoundKP: 'Not found on Kinopoisk',errorNotFoundIMDb: 'Not found on IMDb',errorNotFoundLB: 'Not found on Letterboxd',errorApi: 'API error / network failure',allImported: '🎉 All records imported!',exportDone: '✅ Export complete! File saved.',deepSearchBtn: '🔍 Deep search ({count})',movies: 'movies',favorites: 'Favorites: ',importFavorites: 'Import favorites',language: 'Language',exportHint: 'Download all your ratings from this platform as a CSV file',importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added',hardImportHint: 'Import from CSV and overwrite existing ratings (normal mode skips already-rated films)',importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list',runtime: 'Runtime',directors: 'Directors',actors: 'Actors',premiereDate: 'Premiere date',languageHint: 'Select the interface language',},ru: {time: 'Время',exportRatings: '📤 Экспорт оценок',importRatings: '📥 Импорт',hardImport: '🔄 Полная замена',loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)',kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали',kpListingFailed: 'Не удалось загрузить листинг КП',profileDetect: 'Определяем профиль {platform}',loadedRecords: 'Загружено {count} записей. {next}',checkingExisting: 'Проверяем существующие оценки...',startingImport: 'Начинаем импорт...',importProgress: 'Импорт на {platform} {from}–{to}/{total}',searchProgress: 'Поиск {from}–{to}/{total}',resolveProgress: 'Резолвинг {from}–{to}/{total}',resolveIdCount: 'Резолвинг ID: {count} фильмов',fetchingLid: 'Получение LID: {count} фильмов',applyProgress: 'Применение {from}–{to}/{total}',loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)',deepSearch: 'Глубокий поиск {platform}',scanHistory: 'Сканируем историю {platform}',foundCount: 'Найдено: {count} фильмов. Формируем CSV',userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены',ratings: 'Оценки',watchHistory: 'Просмотры',diary: 'Дневник',watched: 'Просмотрено',page: 'стр.',kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП',imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт',lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль',csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd',csvEmpty: '❌ CSV пуст или не распознан',done: '✅ Готово{mode}!',replaceMode: ' (режим замены)',rated: 'Оценено: ',watchedShort: 'Просмотрено: ',skipped: 'Пропущено: ',notFound: 'Не найдено: ',failed: 'Ошибок: ',errorNotFoundKP: 'Не найдено на Кинопоиске',errorNotFoundIMDb: 'Не найдено на IMDb',errorNotFoundLB: 'Не найдено на Letterboxd',errorApi: 'Ошибка API / сетевой сбой',allImported: '🎉 Все записи импортированы!',exportDone: '✅ Экспорт завершён! Файл сохранён.',deepSearchBtn: '🔍 Искать глубже ({count})',movies: 'фильмов',favorites: 'Избранное: ',importFavorites: 'Импортировать избранное',language: 'Язык',exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл',importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются',hardImportHint: 'Импорт из CSV с перезаписью существующих оценок (обычный режим пропускает уже оценённые фильмы)',importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного',runtime: 'Длительность',directors: 'Режиссёры',actors: 'Актёры',premiereDate: 'Дата премьеры',languageHint: 'Выбор языка интерфейса',},es: {time: 'Tiempo',exportRatings: '📤 Exportar valoraciones',importRatings: '📥 Importar',hardImport: '🔄 Importación forzada',loadingPage: 'Cargando pág. {p}{total} ({count} películas)',kpParseFailed: 'Error al analizar el listado de Kinopoisk',kpListingFailed: 'Error al cargar el listado de Kinopoisk',profileDetect: 'Detectando perfil de {platform}',loadedRecords: 'Cargados {count} registros. {next}',checkingExisting: 'Comprobando valoraciones existentes...',startingImport: 'Iniciando importación...',importProgress: 'Importando a {platform} {from}–{to}/{total}',searchProgress: 'Buscando {from}–{to}/{total}',resolveProgress: 'Resolviendo {from}–{to}/{total}',resolveIdCount: 'Resolviendo IDs: {count} películas',fetchingLid: 'Obteniendo LID: {count} películas',applyProgress: 'Aplicando {from}–{to}/{total}',loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)',deepSearch: 'Búsqueda profunda {platform}',scanHistory: 'Escaneando historial de {platform}',foundCount: 'Encontradas: {count} películas. Generando CSV',userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes',ratings: 'Valoraciones',watchHistory: 'Historial',diary: 'Diario',watched: 'Visto',page: 'página',kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk',imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión',lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil',csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd',csvEmpty: '❌ CSV vacío o no reconocido',done: '✅ ¡Listo{mode}!',replaceMode: ' (modo reemplazo)',rated: 'Valorado: ',watchedShort: 'Visto: ',skipped: 'Omitido: ',notFound: 'No encontrado: ',failed: 'Errores: ',errorNotFoundKP: 'No encontrado en Kinopoisk',errorNotFoundIMDb: 'No encontrado en IMDb',errorNotFoundLB: 'No encontrado en Letterboxd',errorApi: 'Error de API / fallo de red',allImported: '🎉 ¡Todos los registros importados!',exportDone: '✅ ¡Exportación completa! Archivo guardado.',deepSearchBtn: '🔍 Búsqueda profunda ({count})',movies: 'películas',favorites: 'Favoritos: ',importFavorites: 'Importar favoritos',language: 'Idioma',exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV',importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden',hardImportHint: 'Importa desde CSV y sobrescribe las valoraciones existentes',importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista',runtime: 'Duración',directors: 'Directores',actors: 'Actores',premiereDate: 'Fecha de estreno',languageHint: 'Selecciona el idioma de la interfaz',},fr: {time: 'Temps',exportRatings: '📤 Exporter les notes',importRatings: '📥 Importer',hardImport: '🔄 Importation forcée',loadingPage: 'Chargement p. {p}{total} ({count} films)',kpParseFailed: "Échec de l'analyse du listing Kinopoisk",kpListingFailed: 'Échec du chargement du listing Kinopoisk',profileDetect: 'Détection du profil {platform}',loadedRecords: '{count} enregistrements chargés. {next}',checkingExisting: 'Vérification des notes existantes...',startingImport: "Démarrage de l'importation...",importProgress: 'Importation vers {platform} {from}–{to}/{total}',searchProgress: 'Recherche {from}–{to}/{total}',resolveProgress: 'Résolution {from}–{to}/{total}',resolveIdCount: 'Résolution des IDs: {count} films',fetchingLid: 'Récupération LID: {count} films',applyProgress: 'Application {from}–{to}/{total}',loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)',deepSearch: 'Recherche approfondie {platform}',scanHistory: "Analyse de l'historique {platform}",foundCount: 'Trouvés: {count} films. Génération CSV',userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées',ratings: 'Notes',watchHistory: 'Historique',diary: 'Journal',watched: 'Vu',page: 'page',kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk',imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous',lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil',csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd',csvEmpty: '❌ CSV vide ou non reconnu',done: '✅ Terminé{mode}!',replaceMode: ' (mode remplacement)',rated: 'Noté: ',watchedShort: 'Vu: ',skipped: 'Ignoré: ',notFound: 'Introuvable: ',failed: 'Erreurs: ',errorNotFoundKP: 'Non trouvé sur Kinopoisk',errorNotFoundIMDb: 'Non trouvé sur IMDb',errorNotFoundLB: 'Non trouvé sur Letterboxd',errorApi: 'Erreur API / problème réseau',allImported: '🎉 Tous les enregistrements importés!',exportDone: '✅ Export terminé! Fichier sauvegardé.',deepSearchBtn: '🔍 Recherche approfondie ({count})',movies: 'films',favorites: 'Favoris: ',importFavorites: 'Importer les favoris',language: 'Langue',exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV',importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées',hardImportHint: 'Importe depuis CSV et écrase les notes existantes',importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris',runtime: 'Durée',directors: 'Réalisateurs',actors: 'Acteurs',premiereDate: 'Date de sortie',languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera',},de: {time: 'Zeit',exportRatings: '📤 Bewertungen exportieren',importRatings: '📥 Importieren',hardImport: '🔄 Hartimport',loadingPage: 'Lade Seite {p}{total} ({count} Filme)',kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden',kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden',profileDetect: 'Erkenne {platform}-Profil',loadedRecords: '{count} Einträge geladen. {next}',checkingExisting: 'Prüfe bestehende Bewertungen...',startingImport: 'Starte Import...',importProgress: 'Importiere zu {platform} {from}–{to}/{total}',searchProgress: 'Suche {from}–{to}/{total}',resolveProgress: 'Auflösen {from}–{to}/{total}',resolveIdCount: 'Löse IDs auf: {count} Filme',fetchingLid: 'Hole LID: {count} Filme',applyProgress: 'Wende an {from}–{to}/{total}',loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)',deepSearch: 'Tiefensuche {platform}',scanHistory: 'Scanne {platform}-Verlauf',foundCount: 'Gefunden: {count} Filme. Erstelle CSV',userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen',ratings: 'Bewertungen',watchHistory: 'Verlauf',diary: 'Tagebuch',watched: 'Gesehen',page: 'Seite',kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil',imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden',lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil',csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden',csvEmpty: '❌ CSV leer oder nicht erkannt',done: '✅ Fertig{mode}!',replaceMode: ' (Ersetzungsmodus)',rated: 'Bewertet: ',watchedShort: 'Gesehen: ',skipped: 'Übersprungen: ',notFound: 'Nicht gefunden: ',failed: 'Fehler: ',errorNotFoundKP: 'Nicht gefunden auf Kinopoisk',errorNotFoundIMDb: 'Nicht gefunden auf IMDb',errorNotFoundLB: 'Nicht gefunden auf Letterboxd',errorApi: 'API-Fehler / Netzwerkfehler',allImported: '🎉 Alle Einträge importiert!',exportDone: '✅ Export abgeschlossen! Datei gespeichert.',deepSearchBtn: '🔍 Tiefensuche ({count})',movies: 'Filme',favorites: 'Favoriten: ',importFavorites: 'Favoriten importieren',language: 'Sprache',exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter',importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt',hardImportHint: 'Importiert aus CSV und überschreibt bestehende Bewertungen',importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt',runtime: 'Laufzeit',directors: 'Regisseur',actors: 'Schauspieler',premiereDate: 'Premiere',languageHint: 'Wähle die Sprache der Oberfläche',},pt: {time: 'Tempo',exportRatings: '📤 Exportar avaliações',importRatings: '📥 Importar',hardImport: '🔄 Importação forçada',loadingPage: 'Carregando pág. {p}{total} ({count} filmes)',kpParseFailed: 'Falha ao analisar listagem do Kinopoisk',kpListingFailed: 'Falha ao carregar listagem do Kinopoisk',profileDetect: 'Detectando perfil {platform}',loadedRecords: '{count} registros carregados. {next}',checkingExisting: 'Verificando avaliações existentes...',startingImport: 'Iniciando importação...',importProgress: 'Importando para {platform} {from}–{to}/{total}',searchProgress: 'Pesquisando {from}–{to}/{total}',resolveProgress: 'Resolvendo {from}–{to}/{total}',resolveIdCount: 'Resolvendo IDs: {count} filmes',fetchingLid: 'Obtendo LID: {count} filmes',applyProgress: 'Aplicando {from}–{to}/{total}',loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)',deepSearch: 'Pesquisa profunda {platform}',scanHistory: 'Escaneando histórico {platform}',foundCount: 'Encontrados: {count} filmes. Gerando CSV',userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas',ratings: 'Avaliações',watchHistory: 'Histórico',diary: 'Diário',watched: 'Assistido',page: 'página',kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk',imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login',lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil',csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd',csvEmpty: '❌ CSV vazio ou não reconhecido',done: '✅ Concluído{mode}!',replaceMode: ' (modo substituição)',rated: 'Avaliado: ',watchedShort: 'Assistido: ',skipped: 'Ignorado: ',notFound: 'Não encontrado: ',failed: 'Erros: ',errorNotFoundKP: 'Não encontrado no Kinopoisk',errorNotFoundIMDb: 'Não encontrado no IMDb',errorNotFoundLB: 'Não encontrado no Letterboxd',errorApi: 'Erro de API / falha de rede',allImported: '🎉 Todos os registros importados!',exportDone: '✅ Exportação concluída! Arquivo salvo.',deepSearchBtn: '🔍 Pesquisa profunda ({count})',movies: 'filmes',favorites: 'Favoritos: ',importFavorites: 'Importar favoritos',language: 'Idioma',exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV',importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas',hardImportHint: 'Importa de CSV e sobrescreve as avaliações existentes',importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos',runtime: 'Duração',directors: 'Diretores',actors: 'Atores',premiereDate: 'Data de estreia',languageHint: 'Selecione o idioma da interface',},zh: {time: '时间',exportRatings: '📤 导出评分',importRatings: '📥 导入',hardImport: '🔄 强制导入',loadingPage: '加载第 {p}{total} 页 ({count} 部电影)',kpParseFailed: '无法解析 Kinopoisk 列表',kpListingFailed: '无法加载 Kinopoisk 列表',profileDetect: '正在检测 {platform} 个人资料',loadedRecords: '已加载 {count} 条记录。{next}',checkingExisting: '正在检查现有评分...',startingImport: '开始导入...',importProgress: '正在导入到 {platform} {from}–{to}/{total}',searchProgress: '搜索中 {from}–{to}/{total}',resolveProgress: '解析中 {from}–{to}/{total}',resolveIdCount: '解析 ID: {count} 部电影',fetchingLid: '获取 LID: {count} 部电影',applyProgress: '应用中 {from}–{to}/{total}',loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)',deepSearch: '深度搜索 {platform}',scanHistory: '扫描 {platform} 历史记录',foundCount: '找到: {count} 部电影。正在生成 CSV',userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分',ratings: '评分',watchHistory: '观看历史',diary: '日记',watched: '已看',page: '页',kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面',imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户',lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料',csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd',csvEmpty: '❌ CSV 为空或无法识别',done: '✅ 完成{mode}!',replaceMode: ' (替换模式)',rated: '已评分: ',watchedShort: '已看: ',skipped: '已跳过: ',notFound: '未找到: ',failed: '错误: ',errorNotFoundKP: '未在 Kinopoisk 上找到',errorNotFoundIMDb: '未在 IMDb 上找到',errorNotFoundLB: '未在 Letterboxd 上找到',errorApi: 'API 错误 / 网络故障',allImported: '🎉 所有记录已导入!',exportDone: '✅ 导出完成! 文件已保存。',deepSearchBtn: '🔍 深度搜索 ({count})',movies: '部电影',favorites: '收藏: ',importFavorites: '导入收藏',language: '语言',exportHint: '将您在该平台的所有评分下载为 CSV 文件',importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分',hardImportHint: '从 CSV 导入并覆盖现有评分',importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表',runtime: '片长',directors: '导演',actors: '演员',premiereDate: '首映日期',languageHint: '选择界面语言',},ja: {time: '时间',exportRatings: '📤 評価をエクスポート',importRatings: '📥 インポート',hardImport: '🔄 強制インポート',loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)',kpParseFailed: 'Kinopoisk リストの解析に失敗しました',kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました',profileDetect: '{platform} プロフィールを検出中',loadedRecords: '{count} 件のレコードを読み込みました。{next}',checkingExisting: '既存の評価を確認中...',startingImport: 'インポートを開始中...',importProgress: '{platform} へのインポート {from}–{to}/{total}',searchProgress: '検索中 {from}–{to}/{total}',resolveProgress: '解決中 {from}–{to}/{total}',resolveIdCount: 'ID を解決中: {count} 作品',fetchingLid: 'LID を取得中: {count} 作品',applyProgress: '適用中 {from}–{to}/{total}',loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)',deepSearch: '詳細検索 {platform}',scanHistory: '{platform} の履歴をスキャン中',foundCount: '見つかりました: {count} 作品。CSV を生成中',userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません',ratings: '評価',watchHistory: '視聴履歴',diary: '日記',watched: '視聴済み',page: 'ページ',kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください',imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください',lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください',csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください',csvEmpty: '❌ CSV が空であるか認識できません',done: '✅ 完了{mode}!',replaceMode: ' (置換モード)',rated: '評価済み: ',watchedShort: '視聴済み: ',skipped: 'スキップ: ',notFound: '見つかりません: ',failed: 'エラー: ',errorNotFoundKP: 'Kinopoisk で見つかりません',errorNotFoundIMDb: 'IMDb で見つかりません',errorNotFoundLB: 'Letterboxd で見つかりません',errorApi: 'API エラー / ネットワーク障害',allImported: '🎉 すべてのレコードをインポートしました!',exportDone: '✅ エクスポート完了! ファイルを保存しました。',deepSearchBtn: '🔍 詳細検索 ({count})',movies: '作品',favorites: 'お気に入り: ',importFavorites: 'お気に入りをインポート',language: '言語',exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード',importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます',hardImportHint: 'CSVからインポートし、既存の評価を上書きします',importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます',runtime: '上映時間',directors: '監督',actors: '出演者',premiereDate: '公開日',languageHint: 'インターフェース言語を選択',},ko: {time: '시간',exportRatings: '📤 평점 내보내기',importRatings: '📥 가져오기',hardImport: '🔄 강제 가져오기',loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)',kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다',kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다',profileDetect: '{platform} 프로필 감지 중',loadedRecords: '{count}개 기록을 로드했습니다. {next}',checkingExisting: '기존 평점 확인 중...',startingImport: '가져오기 시작...',importProgress: '{platform} 가져오기 중 {from}–{to}/{total}',searchProgress: '검색 중 {from}–{to}/{total}',resolveProgress: '해결 중 {from}–{to}/{total}',resolveIdCount: 'ID 해결 중: {count}편',fetchingLid: 'LID 가져오는 중: {count}편',applyProgress: '적용 중 {from}–{to}/{total}',loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)',deepSearch: '심층 검색 {platform}',scanHistory: '{platform} 기록 스캔 중',foundCount: '찾음: {count}편. CSV 생성 중',userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다',ratings: '평점',watchHistory: '시청 기록',diary: '다이어리',watched: '시청함',page: '페이지',kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요',imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요',lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요',csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요',csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다',done: '✅ 완료{mode}!',replaceMode: ' (대체 모드)',rated: '평가됨: ',watchedShort: '시청함: ',skipped: '건너뜀: ',notFound: '찾을 수 없음: ',failed: '오류: ',errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음',errorNotFoundIMDb: 'IMDb에서 찾을 수 없음',errorNotFoundLB: 'Letterboxd에서 찾을 수 없음',errorApi: 'API 오류 / 네트워크 오류',allImported: '🎉 모든 기록을 가져왔습니다!',exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.',deepSearchBtn: '🔍 심층 검색 ({count})',movies: '편',favorites: '즐겨찾기: ',importFavorites: '즐겨찾기 가져오기',language: '언어',exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드',importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다',hardImportHint: 'CSV에서 가져오고 기존 평점을 덮어씁니다',importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다',runtime: '상영 시간',directors: '감독',actors: '배우',premiereDate: '개봉일',languageHint: '인터페이스 언어 선택',},};
+
+    function getLocale() {
+        // Check localStorage for user-saved language preference
+        try {
+            const saved = GM_getValue('mrs_lang', null);
+            if (saved && TRANSLATIONS[saved]) return saved;
+        } catch (e) { /* ignore */ }
+        const lang = (typeof navigator !== 'undefined' && navigator.language)
+            || (typeof document !== 'undefined' && document.documentElement?.lang)
+            || 'en';
+        const base = String(lang).split('-')[0].toLowerCase();
+        return TRANSLATIONS[base] ? base : 'en';
+    }
+
+    let __locale = getLocale();
+    let __tMap = TRANSLATIONS[__locale] || TRANSLATIONS.en;
+
+    // --- Import Options ---
+    function getImportOptions() {
+        try {
+            const raw = GM_getValue('mrs_options', null);
+            if (raw) return JSON.parse(raw);
+        } catch (e) { /* ignore */ }
+        return { importFavorites: true };
+    }
+    function saveImportOptions(opts) {
+        try { GM_setValue('mrs_options', JSON.stringify(opts)); } catch (e) { /* ignore */ }
+    }
+
+    function t(key, vars) {
+        let s = __tMap[key] ?? TRANSLATIONS.en[key] ?? key;
+        if (vars && typeof vars === 'object') {
+            for (const [k, v] of Object.entries(vars)) {
+                s = s.split(`{${k}}`).join(String(v));
+            }
+        }
+        return s;
+    }
+
+    function formatElapsed(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        if (minutes > 0) return minutes + 'm ' + seconds + 's';
+        return seconds + 's';
+    }
+
+    function applyLocale(code) {
+        if (!TRANSLATIONS[code]) return;
+        __locale = code;
+        __tMap = TRANSLATIONS[code];
+        try { GM_setValue('mrs_lang', code); } catch (e) { /* ignore */ }
+        const panel = document.getElementById('mrs-panel');
+        if (!panel) return;
+        const btnExport = panel.querySelector('.mrs-btn--primary');
+        const btnImport = panel.querySelector('.mrs-btn--secondary');
+        const btnReplace = panel.querySelector('.mrs-btn--danger');
+        if (btnExport) { btnExport.textContent = t('exportRatings'); btnExport.title = t('exportHint'); }
+        if (btnImport) { btnImport.textContent = t('importRatings'); btnImport.title = t('importHint'); }
+        if (btnReplace) { btnReplace.textContent = t('hardImport'); btnReplace.title = t('hardImportHint'); }
+        const labelFav = panel.querySelector('.mrs-opts__row');
+        if (labelFav) {
+            labelFav.title = t('importFavoritesHint');
+            for (let i = labelFav.childNodes.length - 1; i >= 0; i--) {
+                if (labelFav.childNodes[i].nodeType === 3) { labelFav.childNodes[i].textContent = t('importFavorites'); break; }
+            }
+        }
+        const langLabel = panel.querySelector('.mrs-lang-row label');
+        if (langLabel) langLabel.textContent = t('language');
+
+        const langSelect = document.getElementById('mrs-lang-select');
+        if (langSelect) {
+            langSelect.title = t('languageHint');
+            for (const opt of langSelect.options) {
+                if (opt.value === code) { opt.selected = true; break; }
+            }
+        }
+    }
+
+
 
     // ====================== UTILITIES ======================
 
@@ -547,6 +633,7 @@
     const KP_SUGGEST_QUERY = `query SuggestSearch($keyword: String!, $yandexCityId: Int, $limit: Int, $withUserData: Boolean!) { suggest(keyword: $keyword) { top(yandexCityId: $yandexCityId, limit: $limit) { topResult { global { ...SuggestMovieItem ...SuggestPersonItem ...SuggestCinemaItem ...SuggestMovieListItem __typename } __typename } movies { movie { ...SuggestMovieItem __typename } __typename } persons { person { ...SuggestPersonItem __typename } __typename } cinemas { cinema { ...SuggestCinemaItem __typename } __typename } movieLists { movieList { ...SuggestMovieListItem __typename } __typename } __typename } __typename } } fragment ShortImage on Image { avatarsUrl fallbackUrl __typename } fragment MovieHdVerticalPoster on Movie { gallery { posters { hdVertical: vertical(override: OTT_WHEN_EXISTS) { ...ShortImage __typename } __typename } __typename } __typename } fragment MovieKpVerticalPoster on Movie { gallery { posters { kpVertical: vertical { ...ShortImage __typename } __typename } __typename } __typename } fragment TicketOption on Movie { ticketOption { purchasable releaseAnnounce { available releaseDate { accuracy date __typename } __typename } __typename } __typename } fragment SuggestMovieItem on Movie { id contentId title { russian original __typename } rating { kinopoisk { isActive value __typename } __typename } ...MovieHdVerticalPoster ...MovieKpVerticalPoster viewOption { buttonText isAvailableOnline: isWatchable(filter: {anyDevice: false, anyRegion: false}) purchasabilityStatus contentPackageToBuy { billingFeatureName __typename } subscriptionBadge { image { avatarsUrl __typename } __typename } type availabilityAnnounce { groupPeriodType announcePromise availabilityDate type __typename } __typename } ...TicketOption userData @include(if: $withUserData) { isPlannedToWatch __typename } ... on Film { productionYear __typename } ... on TvSeries { releaseYears { end start __typename } __typename } ... on TvShow { releaseYears { end start __typename } __typename } ... on MiniSeries { releaseYears { end start __typename } __typename } __typename } fragment SuggestPersonItem on Person { id name originalName birthDate poster { avatarsUrl fallbackUrl __typename } __typename } fragment SuggestCinemaItem on Cinema { id ctitle: title city { id name geoId __typename } __typename } fragment SuggestMovieListItem on MovieListMeta { id cover { avatarsUrl __typename } coverBackground { avatarsUrl __typename } name url description movies(limit: 0) { total __typename } __typename }`;
     const KP_VOTE_MUT = `mutation MovieSetVote($movieId: Long!, $rate: Int!) {\n  movie {\n    vote {\n      set(input: {movieId: $movieId, rate: $rate}) {\n        error {\n          message\n          __typename\n        }\n        status\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n`;
     const KP_WATCH_MUT = `mutation MovieSetWatched($movieId: Long!) {\n  movie {\n    watched {\n      set(input: {movieId: $movieId}) {\n        error {\n          message\n          __typename\n        }\n        status\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n`;
+    const KP_FAVORITE_MUT = `mutation SetMovieFavorite($movieId: Long!) {\n  movie {\n    favorite {\n      set(input: {movieId: $movieId}) {\n        status\n        error {\n          message\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n`;
 
     async function kpGql(query, variables, op) {
         const url = op ? `${KP_GQL}?operationName=${encodeURIComponent(op)}` : KP_GQL;
@@ -664,25 +751,61 @@
         });
     }
 
-    async function applyKP(kpId, rating) {
+    async function applyKP(kpId, rating, favorite) {
         const hasR = rating != null && String(rating) !== '' && +rating >= 1 && +rating <= 10;
-        const op = hasR ? 'MovieSetVote' : 'MovieSetWatched';
-        const vars = hasR ? { movieId: +kpId, rate: +rating } : { movieId: +kpId };
-        const json = await kpGql(hasR ? KP_VOTE_MUT : KP_WATCH_MUT, vars, op);
-        if (!json) {
-            console.warn(`[mrs] KP apply FAILED (null response): kpId=${kpId} rating=${rating}`);
-            return null;
+        let status = null;
+
+        if (hasR) {
+            const json = await kpGql(KP_VOTE_MUT, { movieId: +kpId, rate: +rating }, 'MovieSetVote');
+            if (!json) {
+                console.warn(`[mrs] KP vote FAILED (null response): kpId=${kpId} rating=${rating}`);
+            } else {
+                if (json.errors) console.warn(`[mrs] KP vote GQL errors: kpId=${kpId}`, JSON.stringify(json.errors).slice(0, 500));
+                const r = json?.data?.movie?.vote?.set;
+                if (r && !r.error) {
+                    status = 'rated';
+                    console.log(`[mrs] KP apply OK: kpId=${kpId} rating=${rating} \u2192 rated`);
+                } else {
+                    console.warn(`[mrs] KP vote FAILED: kpId=${kpId} rating=${rating}`, r?.error?.message || 'no result');
+                }
+            }
+        } else {
+            const json = await kpGql(KP_WATCH_MUT, { movieId: +kpId }, 'MovieSetWatched');
+            if (!json) {
+                console.warn(`[mrs] KP watched FAILED (null response): kpId=${kpId}`);
+            } else {
+                if (json.errors) console.warn(`[mrs] KP watched GQL errors: kpId=${kpId}`, JSON.stringify(json.errors).slice(0, 500));
+                const r = json?.data?.movie?.watched?.set;
+                if (r && !r.error) {
+                    status = 'watched';
+                    console.log(`[mrs] KP apply OK: kpId=${kpId} \u2192 watched`);
+                } else {
+                    console.warn(`[mrs] KP watched FAILED: kpId=${kpId}`, r?.error?.message || 'no result');
+                }
+            }
         }
-        if (json.errors) {
-            console.warn(`[mrs] KP apply ERRORS: kpId=${kpId} rating=${rating}`, JSON.stringify(json.errors).slice(0, 500));
+
+        if (favorite) {
+            try {
+                const favJson = await kpGql(KP_FAVORITE_MUT, { movieId: +kpId }, 'SetMovieFavorite');
+                if (!favJson) {
+                    console.warn(`[mrs] KP favorite FAILED (null response): kpId=${kpId}`);
+                } else {
+                    if (favJson.errors) console.warn(`[mrs] KP favorite GQL errors: kpId=${kpId}`, JSON.stringify(favJson.errors).slice(0, 500));
+                    const r = favJson?.data?.movie?.favorite?.set;
+                    if (r && !r.error) {
+                        console.log(`[mrs] KP favorite OK: kpId=${kpId}`);
+                        if (!status) status = 'favorited';
+                    } else {
+                        console.warn(`[mrs] KP favorite FAILED: kpId=${kpId}`, r?.error?.message || 'no result');
+                    }
+                }
+            } catch (e) {
+                console.warn(`[mrs] KP favorite error: kpId=${kpId}`, e.message);
+            }
         }
-        const r = hasR ? json?.data?.movie?.vote?.set : json?.data?.movie?.watched?.set;
-        if (r?.error) {
-            console.warn(`[mrs] KP apply GQL ERROR: kpId=${kpId} rating=${rating} msg=${r.error.message}`, JSON.stringify(r).slice(0, 300));
-        }
-        const ok = r && !r.error;
-        if (ok) console.log(`[mrs] KP apply OK: kpId=${kpId} rating=${rating} → ${hasR ? 'rated' : 'watched'}`);
-        return ok ? (hasR ? 'rated' : 'watched') : null;
+
+        return status;
     }
 
     async function kpFetchRatings(statusEl) {
@@ -734,7 +857,7 @@
                 const ex = existing.get(kpId);
                 const hasR = item.rating != null && +item.rating >= 1 && +item.rating <= 10;
                 if (mode === 'normal' && ex != null && (ex !== 'watched' || !hasR)) return 'skipped';
-                return await applyKP(kpId, item.rating) ?? 'failed';
+                return await applyKP(kpId, item.rating, item.favorite) ?? 'failed';
             });
             const t0 = Date.now();
             let fail = false;

@@ -44,7 +44,7 @@ A cross-platform userscript to sync, backup, and migrate your movie ratings betw
 1. Install a userscript manager of your choice:
    * [Tampermonkey](https://www.tampermonkey.net/) *(Recommended)*
    * [Violentmonkey](https://violentmonkey.github.io/)
-2. Open the [`movie-ratings-sync.user.js`](movie-ratings-sync.user.js) file in this repository.
+2. Open the [`movie-rating-sync.user.js`](movie-rating-sync.user.js) file in this repository.
 3. Click the **"Raw"** button — your userscript manager will automatically prompt you to install the script.
 
 ### 📖 How To Use
@@ -90,7 +90,7 @@ A cross-platform userscript to sync, backup, and migrate your movie ratings betw
 1. Установите менеджер пользовательских скриптов:
    * [Tampermonkey](https://www.tampermonkey.net/) *(Рекомендуется)*
    * [Violentmonkey](https://violentmonkey.github.io/)
-2. Откройте файл [`movie-ratings-sync.user.js`](movie-ratings-sync.user.js) в этом репозитории.
+2. Откройте файл [`movie-rating-sync.user.js`](movie-rating-sync.user.js) в этом репозитории.
 3. Нажмите кнопку **«Raw»** — менеджер скриптов автоматически предложит установку.
 
 ### 📖 Инструкция
@@ -112,4 +112,4 @@ Distributed under the [GPL-3.0](LICENSE) License.
 
 ### 🤝 Support & Contribution
 
-Found a bug or have a feature request? Feel free to open an [issue](https://github.com/Smokelweiss/MovieRatingsSync/issues). Pull requests are welcome!
+Found a bug or have a feature request? Feel free to open an [issue](https://github.com/Smokelweiss/MovieRatingSync/issues). Pull requests are welcome!

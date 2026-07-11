@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Movie Ratings Sync",
+  "name": "Movie Rating Sync",
   "name:ru": "Синхронизация Кинооценок",
   "version": "1.0",
   "description": "Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more",
@@ -28,6 +28,7 @@
     "https://graphql.kinopoisk.ru/*",
     "https://www.imdb.com/*",
     "https://api.graphql.imdb.com/*",
+    "https://v2.sg.media-imdb.com/*",
     "https://letterboxd.com/*"
   ]
 }
