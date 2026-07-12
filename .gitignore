@@ -17,5 +17,3 @@ Thumbs.db
 *.zip
 _*/
 
-# Generated files (build from src/core.js via node build.js)
-extension/content.js
