@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.0
+// @version      1.1
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -260,6 +260,14 @@
         const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => next());
         await Promise.all(workers);
         return await Promise.all(results);
+    }
+
+    // Resolve with `fallback` if `promise` does not settle within `ms`.
+    // Prevents a single slow title from stalling a whole concurrency batch.
+    function withTimeout(promise, ms, fallback = null) {
+        let tid;
+        const guard = new Promise(resolve => { tid = setTimeout(() => resolve(fallback), ms); });
+        return Promise.race([promise, guard]).finally(() => clearTimeout(tid));
     }
 
     function adjDelay(d, outcome, rt = 0) {
@@ -1035,14 +1043,24 @@
     }
     // ====================== KP MODULE ======================
 
-    function getKPUserId() {
-        const m = location.href.match(/\/user\/(\d+)/);
-        if (m) return m[1];
+    // Kinopoisk profile URLs may use a numeric ID (/user/33976584/) or a social
+    // alias (/user/zigger/). Both work in /user/<ref>/movies/voted-watched URLs,
+    // and the site now redirects numeric IDs to the alias form.
+    function parseKPUserRefFromNextData() {
         try {
             const d = JSON.parse(document.getElementById('__NEXT_DATA__')?.textContent ?? 'null');
             const pp = d?.props?.pageProps;
-            return String(pp?.user?.id ?? pp?.userData?.id ?? pp?.requestContext?.user?.id ?? pp?.currentUser?.id ?? '') || null;
+            const id = pp?.user?.id ?? pp?.userData?.id ?? pp?.requestContext?.user?.id ?? pp?.currentUser?.id;
+            if (id) return String(id);
+            const alias = pp?.socialAlias ?? pp?.user?.socialAlias ?? pp?.userData?.socialAlias;
+            return alias ? String(alias) : null;
         } catch { return null; }
+    }
+
+    function getKPUserId() {
+        const m = location.href.match(/\/user\/([A-Za-z0-9_-]+)(?:[/?#]|$)/);
+        if (m) return decodeURIComponent(m[1]);
+        return parseKPUserRefFromNextData();
     }
 
     async function resolveKPUserId(statusEl) {
@@ -1056,25 +1074,23 @@
             'https://www.kinopoisk.ru/mykp/movies/',
             'https://www.kinopoisk.ru/',
         ];
+        // Prefer the logged-in user's own SSR ref/alias. Generic /user/<slug>
+        // links go last: profile pages also link to other users.
+        const patterns = [
+            /UserProfile:(\d+):/,
+            /"socialAlias"\s*:\s*"([A-Za-z0-9_-]+)"/,
+            /"userId"\s*:\s*"?(\d+)/,
+            /"user"\s*:\s*\{[^}]*"id"\s*:\s*"?(\d+)/,
+            /\/user\/([A-Za-z0-9_-]+)\/?(?:["'?]|$)/,
+        ];
         for (const url of profileUrls) {
             try {
                 const r = await fetchT(url, 10000);
                 if (!r?.ok) continue;
                 const text = await r.text();
-                // Look for user ID in various patterns
-                const patterns = [
-                    /\/user\/(\d+)/,
-                    /"userId":\s*":?\s*(\d+)/,
-                    /"user":\s*\{[^}]*"id":\s*":?\s*(\d+)/,
-                    /"id":"(\d+)"/,
-                    /\/user\/(\d+)/,
-                ];
                 for (const re of patterns) {
                     const m = text.match(re);
-                    if (m) {
-                        uid = m[1];
-                        break;
-                    }
+                    if (m) { uid = m[1]; break; }
                 }
                 if (uid) break;
             } catch (e) { console.warn('[mrs] KP profile fetch error:', e.message); }
@@ -1090,17 +1106,17 @@
     }
 
     function parseKPSSRJson(doc) {
-        const scripts = doc.querySelectorAll('script[data-tid]');
+        const scripts = doc.querySelectorAll('script');
         let ssrText = null;
         for (const s of scripts) {
             const txt = s.textContent || '';
-            if (txt.includes('window.Ya.__ssr_initial_data')) { ssrText = txt; break; }
+            if (txt.includes('__ssr_initial_data')) { ssrText = txt; break; }
         }
         if (!ssrText) return null;
-        const prefix = 'window.Ya.__ssr_initial_data = ';
-        const startIdx = ssrText.indexOf(prefix);
-        if (startIdx === -1) return null;
-        const jsonStart = startIdx + prefix.length;
+        // Accept both "window.Ya.__ssr_initial_data = {...}" and minified variants.
+        const prefixMatch = ssrText.match(/__ssr_initial_data\s*=\s*/);
+        if (!prefixMatch) return null;
+        const jsonStart = prefixMatch.index + prefixMatch[0].length;
         const scriptEndIdx = ssrText.indexOf('</script>', jsonStart);
         const boundary = scriptEndIdx === -1 ? ssrText.length : scriptEndIdx;
         let jsonText = ssrText.substring(jsonStart, boundary).trim();
@@ -1128,14 +1144,14 @@
         const state = ssr?.apolloState;
         if (!state) return null;
         const findReactions = (obj, depth = 0) => {
-            if (!obj || typeof obj !== 'object' || depth > 4) return null;
+            if (!obj || typeof obj !== 'object' || depth > 6) return null;
             if (Array.isArray(obj)) return null;
             for (const key of Object.keys(obj)) {
-                if (key.includes('movieReactions') && obj[key]?.items?.length) {
+                if (key.startsWith('movieReactions') && obj[key]?.items?.length) {
                     return obj[key];
                 }
             }
-            if (depth < 4) {
+            if (depth < 6) {
                 for (const key of Object.keys(obj)) {
                     const val = obj[key];
                     if (val && typeof val === 'object' && !Array.isArray(val)) {
@@ -1166,15 +1182,15 @@
                 yearStart = String(movie.productionYear);
             }
             let rating = null, watched = false, favorite = false;
-            const reactionsEntry = Object.entries(item).find(([k]) => k.startsWith('reactions'));
+            const reactionsEntry = Object.entries(item).find(([k]) => /^reactions(?:\(|$)/.test(k));
             const reactions = reactionsEntry ? reactionsEntry[1] : [];
             for (const r of reactions) {
                 if (!r) continue;
                 const rObj = r.__ref ? state[r.__ref] : r;
                 if (!rObj) continue;
-                if (rObj.__typename === 'Vote' && rObj.value != null) rating = rObj.value;
-                else if (rObj.__typename === 'Watched') watched = true;
-                else if (rObj.__typename === 'Favorite') favorite = true;
+                if (rObj.__typename === 'Vote' && rObj.value != null) rating = +rObj.value;
+                else if (rObj.__typename === 'Watched' || rObj.watched === true) watched = true;
+                else if (rObj.__typename === 'Favorite' || rObj.favorite === true) favorite = true;
             }
             let genres = '';
             if (movie.genres?.length) {
@@ -1197,6 +1213,34 @@
         return results;
     }
 
+    // Determine the last page number from pagination links. The new profile
+    // layout only renders a small window of links, so fall back to the SSR
+    // reaction count divided by the page size.
+    function kpTotalPages(doc, pageSize) {
+        let maxPage = 0;
+        for (const a of doc.querySelectorAll('a[href*="?page="], a[href*="&page="]')) {
+            const m = (a.getAttribute('href') || '').match(/[?&]page=(\d+)/);
+            if (m) maxPage = Math.max(maxPage, +m[1]);
+        }
+        if (maxPage) return maxPage;
+        try {
+            const ssr = parseKPSSRJson(doc);
+            const state = ssr?.apolloState;
+            if (state) {
+                for (const key of Object.keys(state)) {
+                    const v = state[key];
+                    if (!v || typeof v !== 'object') continue;
+                    for (const kk of Object.keys(v)) {
+                        if (kk.startsWith('movieReactions') && Number.isFinite(v[kk]?.total) && pageSize > 0) {
+                            return Math.max(1, Math.ceil(v[kk].total / pageSize));
+                        }
+                    }
+                }
+            }
+        } catch (e) { /* ignore */ }
+        return 1;
+    }
+
     function parseKPListingPage(doc) {
         const ssr = parseKPSSRJson(doc);
         if (ssr) {
@@ -1212,21 +1256,22 @@
             const match = href.match(/\/(film|series)\/(\d+)/);
             if (!match || seen.has(match[2])) continue;
             seen.add(match[2]);
-            const titleEl = item.querySelector('[class*="styles_title"] span');
+            const titleEl = item.querySelector('[class*="styles_title"]');
             const subtitleEl = item.querySelector('[class*="styles_subtitle"]');
             const ratingEl = item.querySelector('[class*="styles_value"]');
             const titleRu = titleEl?.textContent?.trim()
                 || link.querySelector('img')?.alt?.split('.')[0]?.trim() || '';
+            if (!titleRu) continue;
             const subtitle = subtitleEl?.textContent?.trim() || '';
             const year = subtitle.match(/\b(19|20)\d{2}\b/)?.[0] || '';
             const ratingText = ratingEl?.textContent?.trim() || '';
-            const rating = /^\d+$/.test(ratingText) ? +ratingText : null;
+            const rating = /^\d{1,2}$/.test(ratingText) && +ratingText >= 1 && +ratingText <= 10 ? +ratingText : null;
             results.push({
                 titleRu, titleOrig: (() => { if (!subtitle || hasCyr(subtitle)) return ''; const s = subtitle.replace(/^\d{4},\s*/, '').split(',')[0].trim(); return /^\d{4}$/.test(s) ? '' : s; })(),
                 type: match[1] === 'series' ? 'TvSeries' : 'Film',
                 kpId: match[2],
                 yearStart: year, yearEnd: '',
-                rating, watched: rating == null,
+                rating, watched: true,
                 favorite: false,
                 genres: '',
             });
@@ -1270,14 +1315,11 @@
             for (let attempt = 1; attempt <= 3; attempt++) {
                 const { doc } = await fetchDocTimed(`${baseUrl}/?page=1`);
                 if (!doc) break;
-                if (!totalPages) {
-                    for (const a of doc.querySelectorAll('a[href*="?page="], a[href*="&page="]')) {
-                        const m = a.href.match(/[?&]page=(\d+)/);
-                        if (m) totalPages = Math.max(totalPages, +m[1]);
-                    }
-                }
                 items = parseKPListingPage(doc);
-                if (items.length > 0) break;
+                if (items.length > 0) {
+                    if (!totalPages) totalPages = kpTotalPages(doc, items.length);
+                    break;
+                }
                 if (attempt < 3) { stats.retries++; await sleep(800 * attempt); }
             }
             if (items.length === 0) throw new Error(t('kpParseFailed'));
@@ -1639,13 +1681,8 @@
         {
             const { doc } = await fetchDocTimed(`${baseUrl}/?page=1`);
             if (doc) {
-                if (!totalPages) {
-                    for (const a of doc.querySelectorAll('a[href*="?page="], a[href*="&page="]')) {
-                        const m = a.href.match(/[?&]page=(\d+)/);
-                        if (m) totalPages = Math.max(totalPages, +m[1]);
-                    }
-                }
                 const items = parseKPListingPage(doc);
+                if (!totalPages) totalPages = kpTotalPages(doc, items.length);
                 for (const item of items) {
                     if (!item.kpId || map.has(item.kpId)) continue;
                     map.set(item.kpId, item.rating != null ? item.rating : 'watched');
@@ -2297,10 +2334,17 @@
         });
     }
 
+    // Short-lived negative cache: avoids re-searching the same missing title
+    // during repeated imports without poisoning results for long.
+    const _imdbNeg = new Map();
+    const IMDB_NEG_TTL = 6 * 60 * 60 * 1000;
+
     async function searchIMDbFallback(title, year, deep = false, allTitles = [], src = {}) {
         const cacheKey = `imdb:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}|${allTitles.slice(0, 3).map(normTitle).join(',')}`;
         const cached = searchCache.get(cacheKey);
         if (cached !== undefined) return cached;
+        const negTs = _imdbNeg.get(cacheKey);
+        if (negTs && Date.now() - negTs < IMDB_NEG_TTL) return null;
         return dedupeFetch(cacheKey, async () => {
             // --- Phase 1: Suggest API (fast JSON, ~200ms) ---
             // Try the primary title first, then transliteration (for Cyrillic) and
@@ -2338,13 +2382,18 @@
                 if (!best || score > best.score) best = { ...cand, score, confidence: conf };
             }
 
-            // --- Phase 2: HTML fallback (always run, not only deep mode) ---
+            // --- Phase 2: HTML fallback ---
+            // This is the slow path: one full search page per title variant.
+            // Cap it in normal mode and stop as soon as a confident match appears.
             const variants = getTitleVariants(title, allTitles);
-            const qs = [...new Set([...variants, ...(hasCyr(title) ? [translit(title)] : []), ...(title.length < 5 && year ? [] : [])])];
+            const qs = [...new Set([...variants, ...(hasCyr(title) ? [translit(title)] : [])])];
+            const maxQueries = deep ? qs.length : Math.min(qs.length, 3);
 
-            for (const q of qs) {
+            for (const q of qs.slice(0, maxQueries)) {
                 const r = await fetchT(`https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt`);
-                if (!r?.ok) continue;
+                if (!r) continue;
+                if (r.status === 429) { await sleep(1200 + Math.random() * 800); continue; }
+                if (!r.ok) continue;
                 const html = await r.text();
                 const ids = [...new Set([...html.matchAll(/\/title\/(tt\d+)/g)].map(m => m[1]))];
                 if (!ids.length) continue;
@@ -2400,6 +2449,7 @@
                     }
                     if (!best || score > best.score) best = { ...cand, score, confidence: conf };
                 }
+                if (best?.confidence === 'high' && (!year || !best.year || yearsMatch(best.year, year))) break;
             }
 
             if (best) {
@@ -2414,10 +2464,14 @@
             const parent = extractSeriesParent(title);
             if (parent && parent !== title) {
                 DEBUG && console.log(`[mrs] IMDb trying series parent: "${parent}" for "${title}"`);
-                return searchIMDbFallback(parent, year, deep, allTitles, src);
+                const parentResult = await searchIMDbFallback(parent, year, deep, allTitles, src);
+                if (parentResult) searchCache.set(cacheKey, parentResult);
+                else _imdbNeg.set(cacheKey, Date.now());
+                return parentResult;
             }
 
             console.warn(`[mrs] IMDb search FAILED: "${title}" (${year})`);
+            _imdbNeg.set(cacheKey, Date.now());
             return null;
         });
     }
@@ -2498,33 +2552,54 @@
     async function imdbProcess(items, rated, watched, statusEl, deep, mode, opts = {}) {
         Object.assign(imdbProbe, makeProbe(30, PLATFORM_MAX.imdb));
         const resolved = [];
-        let cur = 0;
+        let cur = 0, done = 0, found = 0, lastReport = 0;
+        // Report steady per-title progress, not just once per batch. Users see a
+        // frozen "1–20/6790" otherwise, because a batch can take minutes.
+        const report = (force) => {
+            const now = Date.now();
+            if (!force && now - lastReport < 250) return;
+            lastReport = now;
+            const to = Math.max(done, 1);
+            setStatus(statusEl, t('searchProgress', { from: 1, to, total: items.length }) + ` · ✓ ${found}` + dots(), { current: to, total: items.length });
+        };
+        const itemBudget = deep ? 60000 : 30000;
         while (cur < items.length) {
-            const slice = items.slice(cur, cur + imdbProbe.c);
-            setStatus(statusEl, t('searchProgress', { from: cur + 1, to: Math.min(cur + imdbProbe.c, items.length), total: items.length }) + dots(), { current: Math.min(cur + imdbProbe.c, items.length), total: items.length });
+            const chunkSize = Math.max(1, imdbProbe.c);
+            const slice = items.slice(cur, cur + chunkSize);
+            report(true);
             const t0 = Date.now();
-            const res = await asyncPool(imdbProbe.c, slice, async i => {
+            const res = await asyncPool(chunkSize, slice, async i => {
+                let result;
                 if (i.ttId && /^tt\d+$/.test(i.ttId)) {
-                    return { ttId: i.ttId, score: 1.0, confidence: 'high' };
+                    result = { ttId: i.ttId, score: 1.0, confidence: 'high' };
+                } else {
+                    result = await withTimeout(resolveIMDb(i.title, i.year, deep, i.allTitles || [], i), itemBudget, null);
                 }
-                return resolveIMDb(i.title, i.year, deep, i.allTitles || [], i);
+                done++;
+                if (result?.ttId && result.confidence !== 'low') found++;
+                report(false);
+                return result;
             });
-            let fail = false;
+            let fail = false, empty = 0;
             res.forEach((r, j) => {
                 const result = r.status === 'fulfilled' ? r.value : null;
                 const ttId = result?.ttId ?? null;
                 const confidence = result?.confidence ?? 'low';
-                if (!ttId || confidence === 'low' || (!deep && confidence === 'low')) {
+                if (!ttId || confidence === 'low') {
                     resolved.push({ item: slice[j], ttId: null });
+                    empty++;
                     if (deep) fail = true;
                 } else {
                     resolved.push({ item: slice[j], ttId });
                 }
             });
-            cur += imdbProbe.c;
+            cur += chunkSize;
             const elapsed = Date.now() - t0;
+            // IMDb throttles hard at high concurrency. Shrink the batch when many
+            // titles fail, even in normal mode, instead of hammering at max speed.
+            if (empty / slice.length >= 0.5) fail = true;
             fail ? probeFail(imdbProbe) : probeOk(imdbProbe, elapsed);
-            if (cur < items.length) await sleep(Math.max(30, elapsed < 100 ? 0 : 25));
+            report(true);
         }
         return imdbApplyPhase(resolved, rated, watched, statusEl, mode, items.length, opts);
     }
@@ -3869,8 +3944,11 @@
         };
     __mrsAddStyle(`
         #mrs-wrap{position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-        #mrs-panel{background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
+        #mrs-panel{position:absolute;right:0;bottom:56px;transform-origin:bottom right;background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
         #mrs-panel.mrs--visible{transform:scale(1) translateY(0);opacity:1;pointer-events:auto}
+        #mrs-launcher{width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);background:#111;color:#fff;font:600 10px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.04em;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;padding:0;transition:transform .2s ease,background .2s ease}
+        #mrs-launcher:hover{transform:scale(1.06);background:#222}
+        #mrs-launcher:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
         .mrs-btn{padding:10px 16px;font-weight:600;border:none;border-radius:0;cursor:pointer;font-size:13px;letter-spacing:-.01em;transition:all .2s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;gap:8px;background:#fff;color:#333}
         .mrs-btn:hover{background:#f5f5f5}
         .mrs-btn:first-child{border-radius:13px 13px 0 0}
@@ -3979,6 +4057,7 @@
             const btnExport = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--primary', textContent: t('exportRatings'), title: t('exportHint') });
             btnExport.addEventListener('click', async () => {
                 setDisabled(true);
+                buildUI._collapsePanel?.();
                 const exportStart = Date.now();
                 try {
                     const csv = await mod.export(statusEl);
@@ -4003,6 +4082,7 @@
                 if (!file) return;
                 fileInput.value = '';
                 setDisabled(true);
+                buildUI._collapsePanel?.();
                 clearStatus(statusEl);
                 statusEl.style.display = 'block';
                 try { await mod.import(await file.text(), statusEl, mode, false, getImportOptions()); }
@@ -4017,11 +4097,43 @@
             panel.appendChild(btnReplace);
             panel.appendChild(optsDiv);
             panel.appendChild(langRow);
+
+            // Collapsed launcher: keeps the fixed widget out of Kinopoisk's profile
+            // dropdown (issue #3) while remaining one click away.
+            const launcher = Object.assign(document.createElement('button'), {
+                type: 'button',
+                id: 'mrs-launcher',
+                textContent: 'MRS',
+                title: 'Movie Rating Sync',
+            });
+            launcher.setAttribute('aria-controls', 'mrs-panel');
+            launcher.setAttribute('aria-expanded', 'false');
+            const setPanelOpen = (open) => {
+                panel.classList.toggle('mrs--visible', open);
+                launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
+            };
+            launcher.addEventListener('click', (e) => {
+                e.stopPropagation();
+                setPanelOpen(!panel.classList.contains('mrs--visible'));
+            });
+
             DEBUG && console.log('[mrs] buildUI: panel children count after append=', panel.childNodes.length);
             wrap.appendChild(panel);
+            wrap.appendChild(launcher);
             frag.appendChild(wrap);
             document.body.appendChild(frag);
-            requestAnimationFrame(() => panel.classList.add('mrs--visible'));
+
+            // Close on any click outside the widget (e.g. opening the profile menu).
+            if (buildUI._onDocPointerDown) document.removeEventListener('pointerdown', buildUI._onDocPointerDown, true);
+            buildUI._onDocPointerDown = (e) => {
+                if (!panel.classList.contains('mrs--visible')) return;
+                if (wrap.contains(e.target)) return;
+                setPanelOpen(false);
+            };
+            document.addEventListener('pointerdown', buildUI._onDocPointerDown, true);
+
+            // Collapse the panel when an action starts or the site UI is used.
+            buildUI._collapsePanel = () => setPanelOpen(false);
         } catch (e) {
             console.error('[mrs] buildUI failed:', e);
             const partial = document.getElementById('mrs-wrap');
