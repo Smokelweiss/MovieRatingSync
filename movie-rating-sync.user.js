@@ -12,15 +12,22 @@
 // @match        https://letterboxd.com/*
 // @run-at       document-end
 // @grant        GM_addStyle
+// @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_deleteValue
+// @connect      graphql.kinopoisk.ru
+// @connect      www.kinopoisk.ru
+// @connect      api.graphql.imdb.com
+// @connect      www.imdb.com
+// @connect      sg.media-imdb.com
+// @connect      letterboxd.com
 // @homepageURL  https://github.com/Smokelweiss/MovieRatingSync
 // @supportURL   https://github.com/Smokelweiss/MovieRatingSync/issues
 // @updateURL    https://raw.githubusercontent.com/Smokelweiss/MovieRatingSync/main/movie-rating-sync.user.js
 // @downloadURL  https://raw.githubusercontent.com/Smokelweiss/MovieRatingSync/main/movie-rating-sync.user.js
 // @license      GPL-3.0
 // ==/UserScript==
-
-
-
 
 (function () {
     'use strict';
@@ -50,7 +57,7 @@
 
     // ====================== I18N ======================
 
-const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',importRatings: '📥 Import',hardImport: '🔄 Hard Import',loadingPage: 'Loading page {p}{total} ({count} movies)',kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed',kpListingFailed: 'Failed to load Kinopoisk listing',profileDetect: 'Detecting {platform} profile',loadedRecords: 'Loaded {count} records. {next}',checkingExisting: 'Checking existing ratings...',startingImport: 'Starting import...',importProgress: 'Import to {platform} {from}–{to}/{total}',searchProgress: 'Search {from}–{to}/{total}',resolveProgress: 'Resolving {from}–{to}/{total}',resolveIdCount: 'Resolving IDs: {count} movies',fetchingLid: 'Fetching LID: {count} movies',applyProgress: 'Applying {from}–{to}/{total}',loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)',deepSearch: 'Deep search {platform}',scanHistory: 'Scanning {platform} history',foundCount: 'Found: {count} movies. Generating CSV',userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped',ratings: 'Ratings',watchHistory: 'Watch history',diary: 'Diary',watched: 'Watched',page: 'page',kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page',imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account',lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile',csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account',csvEmpty: '❌ CSV is empty or not recognized',done: '✅ Done{mode}!',replaceMode: ' (replace mode)',rated: 'Rated: ',watchedShort: 'Watched: ',skipped: 'Skipped: ',notFound: 'Not found: ',failed: 'Errors: ',errorNotFoundKP: 'Not found on Kinopoisk',errorNotFoundIMDb: 'Not found on IMDb',errorNotFoundLB: 'Not found on Letterboxd',errorApi: 'API error / network failure',allImported: '🎉 All records imported!',exportDone: '✅ Export complete! File saved.',deepSearchBtn: '🔍 Deep search ({count})',movies: 'movies',favorites: 'Favorites: ',importFavorites: 'Import favorites',language: 'Language',exportHint: 'Download all your ratings from this platform as a CSV file',importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added',hardImportHint: 'Import from CSV and overwrite existing ratings (normal mode skips already-rated films)',importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list',runtime: 'Runtime',directors: 'Directors',actors: 'Actors',premiereDate: 'Premiere date',languageHint: 'Select the interface language',},ru: {time: 'Время',exportRatings: '📤 Экспорт оценок',importRatings: '📥 Импорт',hardImport: '🔄 Полная замена',loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)',kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали',kpListingFailed: 'Не удалось загрузить листинг КП',profileDetect: 'Определяем профиль {platform}',loadedRecords: 'Загружено {count} записей. {next}',checkingExisting: 'Проверяем существующие оценки...',startingImport: 'Начинаем импорт...',importProgress: 'Импорт на {platform} {from}–{to}/{total}',searchProgress: 'Поиск {from}–{to}/{total}',resolveProgress: 'Резолвинг {from}–{to}/{total}',resolveIdCount: 'Резолвинг ID: {count} фильмов',fetchingLid: 'Получение LID: {count} фильмов',applyProgress: 'Применение {from}–{to}/{total}',loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)',deepSearch: 'Глубокий поиск {platform}',scanHistory: 'Сканируем историю {platform}',foundCount: 'Найдено: {count} фильмов. Формируем CSV',userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены',ratings: t(t('ratings')),watchHistory: t('watchHistory'),diary: t(t('diary')),watched: t(t('watched')),page: 'стр.',kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП',imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт',lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль',csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd',csvEmpty: '❌ CSV пуст или не распознан',done: '✅ Готово{mode}!',replaceMode: ' (режим замены)',rated: t('rated'),watchedShort: 'Просмотрено: ',skipped: t('skipped'),notFound: t('notFound'),failed: t('failed'),errorNotFoundKP: 'Не найдено на Кинопоиске',errorNotFoundIMDb: 'Не найдено на IMDb',errorNotFoundLB: 'Не найдено на Letterboxd',errorApi: 'Ошибка API / сетевой сбой',allImported: t('allImported'),exportDone: t('exportDone'),deepSearchBtn: '🔍 Искать глубже ({count})',movies: 'фильмов',favorites: t('favorites'),importFavorites: 'Импортировать избранное',language: 'Язык',exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл',importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются',hardImportHint: 'Импорт из CSV с перезаписью существующих оценок (обычный режим пропускает уже оценённые фильмы)',importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного',runtime: 'Длительность',directors: 'Режиссёры',actors: 'Актёры',premiereDate: 'Дата премьеры',languageHint: 'Выбор языка интерфейса',},es: {time: 'Tiempo',exportRatings: '📤 Exportar valoraciones',importRatings: '📥 Importar',hardImport: '🔄 Importación forzada',loadingPage: 'Cargando pág. {p}{total} ({count} películas)',kpParseFailed: 'Error al analizar el listado de Kinopoisk',kpListingFailed: 'Error al cargar el listado de Kinopoisk',profileDetect: 'Detectando perfil de {platform}',loadedRecords: 'Cargados {count} registros. {next}',checkingExisting: 'Comprobando valoraciones existentes...',startingImport: 'Iniciando importación...',importProgress: 'Importando a {platform} {from}–{to}/{total}',searchProgress: 'Buscando {from}–{to}/{total}',resolveProgress: 'Resolviendo {from}–{to}/{total}',resolveIdCount: 'Resolviendo IDs: {count} películas',fetchingLid: 'Obteniendo LID: {count} películas',applyProgress: 'Aplicando {from}–{to}/{total}',loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)',deepSearch: 'Búsqueda profunda {platform}',scanHistory: 'Escaneando historial de {platform}',foundCount: 'Encontradas: {count} películas. Generando CSV',userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes',ratings: 'Valoraciones',watchHistory: 'Historial',diary: 'Diario',watched: 'Visto',page: 'página',kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk',imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión',lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil',csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd',csvEmpty: '❌ CSV vacío o no reconocido',done: '✅ ¡Listo{mode}!',replaceMode: ' (modo reemplazo)',rated: 'Valorado: ',watchedShort: 'Visto: ',skipped: 'Omitido: ',notFound: 'No encontrado: ',failed: 'Errores: ',errorNotFoundKP: 'No encontrado en Kinopoisk',errorNotFoundIMDb: 'No encontrado en IMDb',errorNotFoundLB: 'No encontrado en Letterboxd',errorApi: 'Error de API / fallo de red',allImported: '🎉 ¡Todos los registros importados!',exportDone: '✅ ¡Exportación completa! Archivo guardado.',deepSearchBtn: '🔍 Búsqueda profunda ({count})',movies: 'películas',favorites: 'Favoritos: ',importFavorites: 'Importar favoritos',language: 'Idioma',exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV',importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden',hardImportHint: 'Importa desde CSV y sobrescribe las valoraciones existentes',importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista',runtime: 'Duración',directors: 'Directores',actors: 'Actores',premiereDate: 'Fecha de estreno',languageHint: 'Selecciona el idioma de la interfaz',},fr: {time: 'Temps',exportRatings: '📤 Exporter les notes',importRatings: '📥 Importer',hardImport: '🔄 Importation forcée',loadingPage: 'Chargement p. {p}{total} ({count} films)',kpParseFailed: "Échec de l'analyse du listing Kinopoisk",kpListingFailed: 'Échec du chargement du listing Kinopoisk',profileDetect: 'Détection du profil {platform}',loadedRecords: '{count} enregistrements chargés. {next}',checkingExisting: 'Vérification des notes existantes...',startingImport: "Démarrage de l'importation...",importProgress: 'Importation vers {platform} {from}–{to}/{total}',searchProgress: 'Recherche {from}–{to}/{total}',resolveProgress: 'Résolution {from}–{to}/{total}',resolveIdCount: 'Résolution des IDs: {count} films',fetchingLid: 'Récupération LID: {count} films',applyProgress: 'Application {from}–{to}/{total}',loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)',deepSearch: 'Recherche approfondie {platform}',scanHistory: "Analyse de l'historique {platform}",foundCount: 'Trouvés: {count} films. Génération CSV',userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées',ratings: 'Notes',watchHistory: 'Historique',diary: 'Journal',watched: 'Vu',page: 'page',kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk',imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous',lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil',csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd',csvEmpty: '❌ CSV vide ou non reconnu',done: '✅ Terminé{mode}!',replaceMode: ' (mode remplacement)',rated: 'Noté: ',watchedShort: 'Vu: ',skipped: 'Ignoré: ',notFound: 'Introuvable: ',failed: 'Erreurs: ',errorNotFoundKP: 'Non trouvé sur Kinopoisk',errorNotFoundIMDb: 'Non trouvé sur IMDb',errorNotFoundLB: 'Non trouvé sur Letterboxd',errorApi: 'Erreur API / problème réseau',allImported: '🎉 Tous les enregistrements importés!',exportDone: '✅ Export terminé! Fichier sauvegardé.',deepSearchBtn: '🔍 Recherche approfondie ({count})',movies: 'films',favorites: 'Favoris: ',importFavorites: 'Importer les favoris',language: 'Langue',exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV',importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées',hardImportHint: 'Importe depuis CSV et écrase les notes existantes',importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris',runtime: 'Durée',directors: 'Réalisateurs',actors: 'Acteurs',premiereDate: 'Date de sortie',languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera',},de: {time: 'Zeit',exportRatings: '📤 Bewertungen exportieren',importRatings: '📥 Importieren',hardImport: '🔄 Hartimport',loadingPage: 'Lade Seite {p}{total} ({count} Filme)',kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden',kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden',profileDetect: 'Erkenne {platform}-Profil',loadedRecords: '{count} Einträge geladen. {next}',checkingExisting: 'Prüfe bestehende Bewertungen...',startingImport: 'Starte Import...',importProgress: 'Importiere zu {platform} {from}–{to}/{total}',searchProgress: 'Suche {from}–{to}/{total}',resolveProgress: 'Auflösen {from}–{to}/{total}',resolveIdCount: 'Löse IDs auf: {count} Filme',fetchingLid: 'Hole LID: {count} Filme',applyProgress: 'Wende an {from}–{to}/{total}',loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)',deepSearch: 'Tiefensuche {platform}',scanHistory: 'Scanne {platform}-Verlauf',foundCount: 'Gefunden: {count} Filme. Erstelle CSV',userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen',ratings: 'Bewertungen',watchHistory: 'Verlauf',diary: 'Tagebuch',watched: 'Gesehen',page: 'Seite',kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil',imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden',lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil',csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden',csvEmpty: '❌ CSV leer oder nicht erkannt',done: '✅ Fertig{mode}!',replaceMode: ' (Ersetzungsmodus)',rated: 'Bewertet: ',watchedShort: 'Gesehen: ',skipped: 'Übersprungen: ',notFound: 'Nicht gefunden: ',failed: 'Fehler: ',errorNotFoundKP: 'Nicht gefunden auf Kinopoisk',errorNotFoundIMDb: 'Nicht gefunden auf IMDb',errorNotFoundLB: 'Nicht gefunden auf Letterboxd',errorApi: 'API-Fehler / Netzwerkfehler',allImported: '🎉 Alle Einträge importiert!',exportDone: '✅ Export abgeschlossen! Datei gespeichert.',deepSearchBtn: '🔍 Tiefensuche ({count})',movies: 'Filme',favorites: 'Favoriten: ',importFavorites: 'Favoriten importieren',language: 'Sprache',exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter',importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt',hardImportHint: 'Importiert aus CSV und überschreibt bestehende Bewertungen',importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt',runtime: 'Laufzeit',directors: 'Regisseur',actors: 'Schauspieler',premiereDate: 'Premiere',languageHint: 'Wähle die Sprache der Oberfläche',},pt: {time: 'Tempo',exportRatings: '📤 Exportar avaliações',importRatings: '📥 Importar',hardImport: '🔄 Importação forçada',loadingPage: 'Carregando pág. {p}{total} ({count} filmes)',kpParseFailed: 'Falha ao analisar listagem do Kinopoisk',kpListingFailed: 'Falha ao carregar listagem do Kinopoisk',profileDetect: 'Detectando perfil {platform}',loadedRecords: '{count} registros carregados. {next}',checkingExisting: 'Verificando avaliações existentes...',startingImport: 'Iniciando importação...',importProgress: 'Importando para {platform} {from}–{to}/{total}',searchProgress: 'Pesquisando {from}–{to}/{total}',resolveProgress: 'Resolvendo {from}–{to}/{total}',resolveIdCount: 'Resolvendo IDs: {count} filmes',fetchingLid: 'Obtendo LID: {count} filmes',applyProgress: 'Aplicando {from}–{to}/{total}',loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)',deepSearch: 'Pesquisa profunda {platform}',scanHistory: 'Escaneando histórico {platform}',foundCount: 'Encontrados: {count} filmes. Gerando CSV',userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas',ratings: 'Avaliações',watchHistory: 'Histórico',diary: 'Diário',watched: 'Assistido',page: 'página',kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk',imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login',lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil',csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd',csvEmpty: '❌ CSV vazio ou não reconhecido',done: '✅ Concluído{mode}!',replaceMode: ' (modo substituição)',rated: 'Avaliado: ',watchedShort: 'Assistido: ',skipped: 'Ignorado: ',notFound: 'Não encontrado: ',failed: 'Erros: ',errorNotFoundKP: 'Não encontrado no Kinopoisk',errorNotFoundIMDb: 'Não encontrado no IMDb',errorNotFoundLB: 'Não encontrado no Letterboxd',errorApi: 'Erro de API / falha de rede',allImported: '🎉 Todos os registros importados!',exportDone: '✅ Exportação concluída! Arquivo salvo.',deepSearchBtn: '🔍 Pesquisa profunda ({count})',movies: 'filmes',favorites: 'Favoritos: ',importFavorites: 'Importar favoritos',language: 'Idioma',exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV',importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas',hardImportHint: 'Importa de CSV e sobrescreve as avaliações existentes',importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos',runtime: 'Duração',directors: 'Diretores',actors: 'Atores',premiereDate: 'Data de estreia',languageHint: 'Selecione o idioma da interface',},zh: {time: '时间',exportRatings: '📤 导出评分',importRatings: '📥 导入',hardImport: '🔄 强制导入',loadingPage: '加载第 {p}{total} 页 ({count} 部电影)',kpParseFailed: '无法解析 Kinopoisk 列表',kpListingFailed: '无法加载 Kinopoisk 列表',profileDetect: '正在检测 {platform} 个人资料',loadedRecords: '已加载 {count} 条记录。{next}',checkingExisting: '正在检查现有评分...',startingImport: '开始导入...',importProgress: '正在导入到 {platform} {from}–{to}/{total}',searchProgress: '搜索中 {from}–{to}/{total}',resolveProgress: '解析中 {from}–{to}/{total}',resolveIdCount: '解析 ID: {count} 部电影',fetchingLid: '获取 LID: {count} 部电影',applyProgress: '应用中 {from}–{to}/{total}',loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)',deepSearch: '深度搜索 {platform}',scanHistory: '扫描 {platform} 历史记录',foundCount: '找到: {count} 部电影。正在生成 CSV',userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分',ratings: '评分',watchHistory: '观看历史',diary: '日记',watched: '已看',page: '页',kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面',imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户',lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料',csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd',csvEmpty: '❌ CSV 为空或无法识别',done: '✅ 完成{mode}!',replaceMode: ' (替换模式)',rated: '已评分: ',watchedShort: '已看: ',skipped: '已跳过: ',notFound: '未找到: ',failed: '错误: ',errorNotFoundKP: '未在 Kinopoisk 上找到',errorNotFoundIMDb: '未在 IMDb 上找到',errorNotFoundLB: '未在 Letterboxd 上找到',errorApi: 'API 错误 / 网络故障',allImported: '🎉 所有记录已导入!',exportDone: '✅ 导出完成! 文件已保存。',deepSearchBtn: '🔍 深度搜索 ({count})',movies: '部电影',favorites: '收藏: ',importFavorites: '导入收藏',language: '语言',exportHint: '将您在该平台的所有评分下载为 CSV 文件',importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分',hardImportHint: '从 CSV 导入并覆盖现有评分',importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表',runtime: '片长',directors: '导演',actors: '演员',premiereDate: '首映日期',languageHint: '选择界面语言',},ja: {time: '时间',exportRatings: '📤 評価をエクスポート',importRatings: '📥 インポート',hardImport: '🔄 強制インポート',loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)',kpParseFailed: 'Kinopoisk リストの解析に失敗しました',kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました',profileDetect: '{platform} プロフィールを検出中',loadedRecords: '{count} 件のレコードを読み込みました。{next}',checkingExisting: '既存の評価を確認中...',startingImport: 'インポートを開始中...',importProgress: '{platform} へのインポート {from}–{to}/{total}',searchProgress: '検索中 {from}–{to}/{total}',resolveProgress: '解決中 {from}–{to}/{total}',resolveIdCount: 'ID を解決中: {count} 作品',fetchingLid: 'LID を取得中: {count} 作品',applyProgress: '適用中 {from}–{to}/{total}',loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)',deepSearch: '詳細検索 {platform}',scanHistory: '{platform} の履歴をスキャン中',foundCount: '見つかりました: {count} 作品。CSV を生成中',userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません',ratings: '評価',watchHistory: '視聴履歴',diary: '日記',watched: '視聴済み',page: 'ページ',kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください',imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください',lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください',csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください',csvEmpty: '❌ CSV が空であるか認識できません',done: '✅ 完了{mode}!',replaceMode: ' (置換モード)',rated: '評価済み: ',watchedShort: '視聴済み: ',skipped: 'スキップ: ',notFound: '見つかりません: ',failed: 'エラー: ',errorNotFoundKP: 'Kinopoisk で見つかりません',errorNotFoundIMDb: 'IMDb で見つかりません',errorNotFoundLB: 'Letterboxd で見つかりません',errorApi: 'API エラー / ネットワーク障害',allImported: '🎉 すべてのレコードをインポートしました!',exportDone: '✅ エクスポート完了! ファイルを保存しました。',deepSearchBtn: '🔍 詳細検索 ({count})',movies: '作品',favorites: 'お気に入り: ',importFavorites: 'お気に入りをインポート',language: '言語',exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード',importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます',hardImportHint: 'CSVからインポートし、既存の評価を上書きします',importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます',runtime: '上映時間',directors: '監督',actors: '出演者',premiereDate: '公開日',languageHint: 'インターフェース言語を選択',},ko: {time: '시간',exportRatings: '📤 평점 내보내기',importRatings: '📥 가져오기',hardImport: '🔄 강제 가져오기',loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)',kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다',kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다',profileDetect: '{platform} 프로필 감지 중',loadedRecords: '{count}개 기록을 로드했습니다. {next}',checkingExisting: '기존 평점 확인 중...',startingImport: '가져오기 시작...',importProgress: '{platform} 가져오기 중 {from}–{to}/{total}',searchProgress: '검색 중 {from}–{to}/{total}',resolveProgress: '해결 중 {from}–{to}/{total}',resolveIdCount: 'ID 해결 중: {count}편',fetchingLid: 'LID 가져오는 중: {count}편',applyProgress: '적용 중 {from}–{to}/{total}',loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)',deepSearch: '심층 검색 {platform}',scanHistory: '{platform} 기록 스캔 중',foundCount: '찾음: {count}편. CSV 생성 중',userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다',ratings: '평점',watchHistory: '시청 기록',diary: '다이어리',watched: '시청함',page: '페이지',kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요',imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요',lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요',csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요',csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다',done: '✅ 완료{mode}!',replaceMode: ' (대체 모드)',rated: '평가됨: ',watchedShort: '시청함: ',skipped: '건너뜀: ',notFound: '찾을 수 없음: ',failed: '오류: ',errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음',errorNotFoundIMDb: 'IMDb에서 찾을 수 없음',errorNotFoundLB: 'Letterboxd에서 찾을 수 없음',errorApi: 'API 오류 / 네트워크 오류',allImported: '🎉 모든 기록을 가져왔습니다!',exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.',deepSearchBtn: '🔍 심층 검색 ({count})',movies: '편',favorites: '즐겨찾기: ',importFavorites: '즐겨찾기 가져오기',language: '언어',exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드',importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다',hardImportHint: 'CSV에서 가져오고 기존 평점을 덮어씁니다',importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다',runtime: '상영 시간',directors: '감독',actors: '배우',premiereDate: '개봉일',languageHint: '인터페이스 언어 선택',},};
+    const TRANSLATIONS = { en: { time: 'Time', exportRatings: '📤 Export Ratings', importRatings: '📥 Import', hardImport: '🔄 Hard Import', loadingPage: 'Loading page {p}{total} ({count} movies)', kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed', kpListingFailed: 'Failed to load Kinopoisk listing', profileDetect: 'Detecting {platform} profile', loadedRecords: 'Loaded {count} records. {next}', checkingExisting: 'Checking existing ratings...', startingImport: 'Starting import...', importProgress: 'Import to {platform} {from}–{to}/{total}', searchProgress: 'Search {from}–{to}/{total}', resolveProgress: 'Resolving {from}–{to}/{total}', resolveIdCount: 'Resolving IDs: {count} movies', fetchingLid: 'Fetching LID: {count} movies', applyProgress: 'Applying {from}–{to}/{total}', loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)', deepSearch: 'Deep search {platform}', scanHistory: 'Scanning {platform} history', foundCount: 'Found: {count} movies. Generating CSV', userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped', ratings: 'Ratings', watchHistory: 'Watch history', diary: 'Diary', watched: 'Watched', page: 'page', kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page', imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account', lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile', csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account', csvEmpty: '❌ CSV is empty or not recognized', done: '✅ Done{mode}!', replaceMode: ' (replace mode)', rated: 'Rated: ', watchedShort: 'Watched: ', skipped: 'Skipped: ', notFound: 'Not found: ', failed: 'Errors: ', errorNotFoundKP: 'Not found on Kinopoisk', errorNotFoundIMDb: 'Not found on IMDb', errorNotFoundLB: 'Not found on Letterboxd', errorApi: 'API error / network failure', allImported: '🎉 All records imported!', exportDone: '✅ Export complete! File saved.', deepSearchBtn: '🔍 Deep search ({count})', movies: 'movies', favorites: 'Favorites: ', likes: 'Likes', importFavorites: 'Import favorites', language: 'Language', exportHint: 'Download all your ratings from this platform as a CSV file', importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added', hardImportHint: 'Import from CSV and overwrite existing ratings (normal mode skips already-rated films)', importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list', runtime: 'Runtime', directors: 'Directors', actors: 'Actors', premiereDate: 'Premiere date', languageHint: 'Select the interface language', imdbNoData: 'No ratings or watch history found — make sure you are logged in and have rated films on IMDb', }, ru: { time: 'Время', exportRatings: '📤 Экспорт оценок', importRatings: '📥 Импорт', hardImport: '🔄 Полная замена', loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)', kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали', kpListingFailed: 'Не удалось загрузить листинг КП', profileDetect: 'Определяем профиль {platform}', loadedRecords: 'Загружено {count} записей. {next}', checkingExisting: 'Проверяем существующие оценки...', startingImport: 'Начинаем импорт...', importProgress: 'Импорт на {platform} {from}–{to}/{total}', searchProgress: 'Поиск {from}–{to}/{total}', resolveProgress: 'Резолвинг {from}–{to}/{total}', resolveIdCount: 'Резолвинг ID: {count} фильмов', fetchingLid: 'Получение LID: {count} фильмов', applyProgress: 'Применение {from}–{to}/{total}', loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)', deepSearch: 'Глубокий поиск {platform}', scanHistory: 'Сканируем историю {platform}', foundCount: 'Найдено: {count} фильмов. Формируем CSV', userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены', ratings: 'Оценки', watchHistory: 'Просмотры', diary: 'Дневник', watched: 'Просмотрено', page: 'стр.', kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП', imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт', lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль', csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd', csvEmpty: '❌ CSV пуст или не распознан', done: '✅ Готово{mode}!', replaceMode: ' (режим замены)', rated: 'Оценено: ', watchedShort: 'Просмотрено: ', skipped: 'Пропущено: ', notFound: 'Не найдено: ', failed: 'Ошибок: ', errorNotFoundKP: 'Не найдено на Кинопоиске', errorNotFoundIMDb: 'Не найдено на IMDb', errorNotFoundLB: 'Не найдено на Letterboxd', errorApi: 'Ошибка API / сетевой сбой', allImported: '🎉 Все записи импортированы!', exportDone: '✅ Экспорт завершён! Файл сохранён.', deepSearchBtn: '🔍 Искать глубже ({count})', movies: 'фильмов', favorites: 'Избранное: ', likes: 'Лайки', importFavorites: 'Импортировать избранное', language: 'Язык', exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл', importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются', hardImportHint: 'Импорт из CSV с перезаписью существующих оценок (обычный режим пропускает уже оценённые фильмы)', importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного', runtime: 'Длительность', directors: 'Режиссёры', actors: 'Актёры', premiereDate: 'Дата премьеры', languageHint: 'Выбор языка интерфейса', imdbNoData: 'Нет оценок или истории просмотров — убедитесь, что вы вошли в аккаунт и оценили фильмы на IMDb', }, es: { time: 'Tiempo', exportRatings: '📤 Exportar valoraciones', importRatings: '📥 Importar', hardImport: '🔄 Importación forzada', loadingPage: 'Cargando pág. {p}{total} ({count} películas)', kpParseFailed: 'Error al analizar el listado de Kinopoisk', kpListingFailed: 'Error al cargar el listado de Kinopoisk', profileDetect: 'Detectando perfil de {platform}', loadedRecords: 'Cargados {count} registros. {next}', checkingExisting: 'Comprobando valoraciones existentes...', startingImport: 'Iniciando importación...', importProgress: 'Importando a {platform} {from}–{to}/{total}', searchProgress: 'Buscando {from}–{to}/{total}', resolveProgress: 'Resolviendo {from}–{to}/{total}', resolveIdCount: 'Resolviendo IDs: {count} películas', fetchingLid: 'Obteniendo LID: {count} películas', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)', deepSearch: 'Búsqueda profunda {platform}', scanHistory: 'Escaneando historial de {platform}', foundCount: 'Encontradas: {count} películas. Generando CSV', userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes', ratings: 'Valoraciones', watchHistory: 'Historial', diary: 'Diario', watched: 'Visto', page: 'página', kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk', imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión', lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil', csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd', csvEmpty: '❌ CSV vacío o no reconocido', done: '✅ ¡Listo{mode}!', replaceMode: ' (modo reemplazo)', rated: 'Valorado: ', watchedShort: 'Visto: ', skipped: 'Omitido: ', notFound: 'No encontrado: ', failed: 'Errores: ', errorNotFoundKP: 'No encontrado en Kinopoisk', errorNotFoundIMDb: 'No encontrado en IMDb', errorNotFoundLB: 'No encontrado en Letterboxd', errorApi: 'Error de API / fallo de red', allImported: '🎉 ¡Todos los registros importados!', exportDone: '✅ ¡Exportación completa! Archivo guardado.', deepSearchBtn: '🔍 Búsqueda profunda ({count})', movies: 'películas', favorites: 'Favoritos: ', likes: 'Me gusta', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV', importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden', hardImportHint: 'Importa desde CSV y sobrescribe las valoraciones existentes', importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista', runtime: 'Duración', directors: 'Directores', actors: 'Actores', premiereDate: 'Fecha de estreno', languageHint: 'Selecciona el idioma de la interfaz', imdbNoData: 'No se encontraron valoraciones ni historial — inicia sesión y valora películas en IMDb', }, fr: { time: 'Temps', exportRatings: '📤 Exporter les notes', importRatings: '📥 Importer', hardImport: '🔄 Importation forcée', loadingPage: 'Chargement p. {p}{total} ({count} films)', kpParseFailed: "Échec de l'analyse du listing Kinopoisk", kpListingFailed: 'Échec du chargement du listing Kinopoisk', profileDetect: 'Détection du profil {platform}', loadedRecords: '{count} enregistrements chargés. {next}', checkingExisting: 'Vérification des notes existantes...', startingImport: "Démarrage de l'importation...", importProgress: 'Importation vers {platform} {from}–{to}/{total}', searchProgress: 'Recherche {from}–{to}/{total}', resolveProgress: 'Résolution {from}–{to}/{total}', resolveIdCount: 'Résolution des IDs: {count} films', fetchingLid: 'Récupération LID: {count} films', applyProgress: 'Application {from}–{to}/{total}', loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)', deepSearch: 'Recherche approfondie {platform}', scanHistory: "Analyse de l'historique {platform}", foundCount: 'Trouvés: {count} films. Génération CSV', userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées', ratings: 'Notes', watchHistory: 'Historique', diary: 'Journal', watched: 'Vu', page: 'page', kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk', imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous', lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil', csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd', csvEmpty: '❌ CSV vide ou non reconnu', done: '✅ Terminé{mode}!', replaceMode: ' (mode remplacement)', rated: 'Noté: ', watchedShort: 'Vu: ', skipped: 'Ignoré: ', notFound: 'Introuvable: ', failed: 'Erreurs: ', errorNotFoundKP: 'Non trouvé sur Kinopoisk', errorNotFoundIMDb: 'Non trouvé sur IMDb', errorNotFoundLB: 'Non trouvé sur Letterboxd', errorApi: 'Erreur API / problème réseau', allImported: '🎉 Tous les enregistrements importés!', exportDone: '✅ Export terminé! Fichier sauvegardé.', deepSearchBtn: '🔍 Recherche approfondie ({count})', movies: 'films', favorites: 'Favoris: ', likes: 'J\'aime', importFavorites: 'Importer les favoris', language: 'Langue', exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV', importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées', hardImportHint: 'Importe depuis CSV et écrase les notes existantes', importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris', runtime: 'Durée', directors: 'Réalisateurs', actors: 'Acteurs', premiereDate: 'Date de sortie', languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera', imdbNoData: 'Aucune note ni historique trouvé — connectez-vous et notez des films sur IMDb', }, de: { time: 'Zeit', exportRatings: '📤 Bewertungen exportieren', importRatings: '📥 Importieren', hardImport: '🔄 Hartimport', loadingPage: 'Lade Seite {p}{total} ({count} Filme)', kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden', kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden', profileDetect: 'Erkenne {platform}-Profil', loadedRecords: '{count} Einträge geladen. {next}', checkingExisting: 'Prüfe bestehende Bewertungen...', startingImport: 'Starte Import...', importProgress: 'Importiere zu {platform} {from}–{to}/{total}', searchProgress: 'Suche {from}–{to}/{total}', resolveProgress: 'Auflösen {from}–{to}/{total}', resolveIdCount: 'Löse IDs auf: {count} Filme', fetchingLid: 'Hole LID: {count} Filme', applyProgress: 'Wende an {from}–{to}/{total}', loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)', deepSearch: 'Tiefensuche {platform}', scanHistory: 'Scanne {platform}-Verlauf', foundCount: 'Gefunden: {count} Filme. Erstelle CSV', userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen', ratings: 'Bewertungen', watchHistory: 'Verlauf', diary: 'Tagebuch', watched: 'Gesehen', page: 'Seite', kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil', imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden', lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil', csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden', csvEmpty: '❌ CSV leer oder nicht erkannt', done: '✅ Fertig{mode}!', replaceMode: ' (Ersetzungsmodus)', rated: 'Bewertet: ', watchedShort: 'Gesehen: ', skipped: 'Übersprungen: ', notFound: 'Nicht gefunden: ', failed: 'Fehler: ', errorNotFoundKP: 'Nicht gefunden auf Kinopoisk', errorNotFoundIMDb: 'Nicht gefunden auf IMDb', errorNotFoundLB: 'Nicht gefunden auf Letterboxd', errorApi: 'API-Fehler / Netzwerkfehler', allImported: '🎉 Alle Einträge importiert!', exportDone: '✅ Export abgeschlossen! Datei gespeichert.', deepSearchBtn: '🔍 Tiefensuche ({count})', movies: 'Filme', favorites: 'Favoriten: ', likes: 'Gefällt mir', importFavorites: 'Favoriten importieren', language: 'Sprache', exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter', importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt', hardImportHint: 'Importiert aus CSV und überschreibt bestehende Bewertungen', importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt', runtime: 'Laufzeit', directors: 'Regisseur', actors: 'Schauspieler', premiereDate: 'Premiere', languageHint: 'Wähle die Sprache der Oberfläche', imdbNoData: 'Keine Bewertungen oder Verlauf gefunden — melde dich an und bewerte Filme auf IMDb', }, pt: { time: 'Tempo', exportRatings: '📤 Exportar avaliações', importRatings: '📥 Importar', hardImport: '🔄 Importação forçada', loadingPage: 'Carregando pág. {p}{total} ({count} filmes)', kpParseFailed: 'Falha ao analisar listagem do Kinopoisk', kpListingFailed: 'Falha ao carregar listagem do Kinopoisk', profileDetect: 'Detectando perfil {platform}', loadedRecords: '{count} registros carregados. {next}', checkingExisting: 'Verificando avaliações existentes...', startingImport: 'Iniciando importação...', importProgress: 'Importando para {platform} {from}–{to}/{total}', searchProgress: 'Pesquisando {from}–{to}/{total}', resolveProgress: 'Resolvendo {from}–{to}/{total}', resolveIdCount: 'Resolvendo IDs: {count} filmes', fetchingLid: 'Obtendo LID: {count} filmes', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)', deepSearch: 'Pesquisa profunda {platform}', scanHistory: 'Escaneando histórico {platform}', foundCount: 'Encontrados: {count} filmes. Gerando CSV', userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas', ratings: 'Avaliações', watchHistory: 'Histórico', diary: 'Diário', watched: 'Assistido', page: 'página', kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk', imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login', lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil', csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd', csvEmpty: '❌ CSV vazio ou não reconhecido', done: '✅ Concluído{mode}!', replaceMode: ' (modo substituição)', rated: 'Avaliado: ', watchedShort: 'Assistido: ', skipped: 'Ignorado: ', notFound: 'Não encontrado: ', failed: 'Erros: ', errorNotFoundKP: 'Não encontrado no Kinopoisk', errorNotFoundIMDb: 'Não encontrado no IMDb', errorNotFoundLB: 'Não encontrado no Letterboxd', errorApi: 'Erro de API / falha de rede', allImported: '🎉 Todos os registros importados!', exportDone: '✅ Exportação concluída! Arquivo salvo.', deepSearchBtn: '🔍 Pesquisa profunda ({count})', movies: 'filmes', favorites: 'Favoritos: ', likes: 'Curtidas', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV', importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas', hardImportHint: 'Importa de CSV e sobrescreve as avaliações existentes', importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos', runtime: 'Duração', directors: 'Diretores', actors: 'Atores', premiereDate: 'Data de estreia', languageHint: 'Selecione o idioma da interface', imdbNoData: 'Nenhuma avaliação ou histórico encontrado — faça login e avalie filmes no IMDb', }, zh: { time: '时间', exportRatings: '📤 导出评分', importRatings: '📥 导入', hardImport: '🔄 强制导入', loadingPage: '加载第 {p}{total} 页 ({count} 部电影)', kpParseFailed: '无法解析 Kinopoisk 列表', kpListingFailed: '无法加载 Kinopoisk 列表', profileDetect: '正在检测 {platform} 个人资料', loadedRecords: '已加载 {count} 条记录。{next}', checkingExisting: '正在检查现有评分...', startingImport: '开始导入...', importProgress: '正在导入到 {platform} {from}–{to}/{total}', searchProgress: '搜索中 {from}–{to}/{total}', resolveProgress: '解析中 {from}–{to}/{total}', resolveIdCount: '解析 ID: {count} 部电影', fetchingLid: '获取 LID: {count} 部电影', applyProgress: '应用中 {from}–{to}/{total}', loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)', deepSearch: '深度搜索 {platform}', scanHistory: '扫描 {platform} 历史记录', foundCount: '找到: {count} 部电影。正在生成 CSV', userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分', ratings: '评分', watchHistory: '观看历史', diary: '日记', watched: '已看', page: '页', kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面', imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户', lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料', csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd', csvEmpty: '❌ CSV 为空或无法识别', done: '✅ 完成{mode}!', replaceMode: ' (替换模式)', rated: '已评分: ', watchedShort: '已看: ', skipped: '已跳过: ', notFound: '未找到: ', failed: '错误: ', errorNotFoundKP: '未在 Kinopoisk 上找到', errorNotFoundIMDb: '未在 IMDb 上找到', errorNotFoundLB: '未在 Letterboxd 上找到', errorApi: 'API 错误 / 网络故障', allImported: '🎉 所有记录已导入!', exportDone: '✅ 导出完成! 文件已保存。', deepSearchBtn: '🔍 深度搜索 ({count})', movies: '部电影', favorites: '收藏: ', likes: '赞', importFavorites: '导入收藏', language: '语言', exportHint: '将您在该平台的所有评分下载为 CSV 文件', importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分', hardImportHint: '从 CSV 导入并覆盖现有评分', importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表', runtime: '片长', directors: '导演', actors: '演员', premiereDate: '首映日期', languageHint: '选择界面语言', imdbNoData: '未找到评分或观看历史 — 请登录并在IMDb上评分电影', }, ja: { time: '时间', exportRatings: '📤 評価をエクスポート', importRatings: '📥 インポート', hardImport: '🔄 強制インポート', loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)', kpParseFailed: 'Kinopoisk リストの解析に失敗しました', kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました', profileDetect: '{platform} プロフィールを検出中', loadedRecords: '{count} 件のレコードを読み込みました。{next}', checkingExisting: '既存の評価を確認中...', startingImport: 'インポートを開始中...', importProgress: '{platform} へのインポート {from}–{to}/{total}', searchProgress: '検索中 {from}–{to}/{total}', resolveProgress: '解決中 {from}–{to}/{total}', resolveIdCount: 'ID を解決中: {count} 作品', fetchingLid: 'LID を取得中: {count} 作品', applyProgress: '適用中 {from}–{to}/{total}', loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)', deepSearch: '詳細検索 {platform}', scanHistory: '{platform} の履歴をスキャン中', foundCount: '見つかりました: {count} 作品。CSV を生成中', userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません', ratings: '評価', watchHistory: '視聴履歴', diary: '日記', watched: '視聴済み', page: 'ページ', kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください', imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください', lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください', csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください', csvEmpty: '❌ CSV が空であるか認識できません', done: '✅ 完了{mode}!', replaceMode: ' (置換モード)', rated: '評価済み: ', watchedShort: '視聴済み: ', skipped: 'スキップ: ', notFound: '見つかりません: ', failed: 'エラー: ', errorNotFoundKP: 'Kinopoisk で見つかりません', errorNotFoundIMDb: 'IMDb で見つかりません', errorNotFoundLB: 'Letterboxd で見つかりません', errorApi: 'API エラー / ネットワーク障害', allImported: '🎉 すべてのレコードをインポートしました!', exportDone: '✅ エクスポート完了! ファイルを保存しました。', deepSearchBtn: '🔍 詳細検索 ({count})', movies: '作品', favorites: 'お気に入り: ', likes: 'いいね', importFavorites: 'お気に入りをインポート', language: '言語', exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード', importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます', hardImportHint: 'CSVからインポートし、既存の評価を上書きします', importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます', runtime: '上映時間', directors: '監督', actors: '出演者', premiereDate: '公開日', languageHint: 'インターフェース言語を選択', imdbNoData: '評価や視聴履歴が見つかりません — ログインしてIMDbで映画を評価してください', }, ko: { time: '시간', exportRatings: '📤 평점 내보내기', importRatings: '📥 가져오기', hardImport: '🔄 강제 가져오기', loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)', kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다', kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다', profileDetect: '{platform} 프로필 감지 중', loadedRecords: '{count}개 기록을 로드했습니다. {next}', checkingExisting: '기존 평점 확인 중...', startingImport: '가져오기 시작...', importProgress: '{platform} 가져오기 중 {from}–{to}/{total}', searchProgress: '검색 중 {from}–{to}/{total}', resolveProgress: '해결 중 {from}–{to}/{total}', resolveIdCount: 'ID 해결 중: {count}편', fetchingLid: 'LID 가져오는 중: {count}편', applyProgress: '적용 중 {from}–{to}/{total}', loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)', deepSearch: '심층 검색 {platform}', scanHistory: '{platform} 기록 스캔 중', foundCount: '찾음: {count}편. CSV 생성 중', userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다', ratings: '평점', watchHistory: '시청 기록', diary: '다이어리', watched: '시청함', page: '페이지', kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요', imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요', lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요', csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요', csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다', done: '✅ 완료{mode}!', replaceMode: ' (대체 모드)', rated: '평가됨: ', watchedShort: '시청함: ', skipped: '건너뜀: ', notFound: '찾을 수 없음: ', failed: '오류: ', errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음', errorNotFoundIMDb: 'IMDb에서 찾을 수 없음', errorNotFoundLB: 'Letterboxd에서 찾을 수 없음', errorApi: 'API 오류 / 네트워크 오류', allImported: '🎉 모든 기록을 가져왔습니다!', exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.', deepSearchBtn: '🔍 심층 검색 ({count})', movies: '편', favorites: '즐겨찾기: ', likes: '좋아요', importFavorites: '즐겨찾기 가져오기', language: '언어', exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드', importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다', hardImportHint: 'CSV에서 가져오고 기존 평점을 덮어씁니다', importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다', runtime: '상영 시간', directors: '감독', actors: '배우', premiereDate: '개봉일', languageHint: '인터페이스 언어 선택', imdbNoData: '평점이나 시청 기록이 없습니다 — 로그인 후 IMDb에서 영화를 평가하세요', }, };
 
     function getLocale() {
         // Check localStorage for user-saved language preference
@@ -130,8 +137,6 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         }
     }
 
-
-
     // ====================== UTILITIES ======================
 
     const sleep = ms => new Promise(r => setTimeout(r, Math.max(ms, 1)));
@@ -152,28 +157,79 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         };
     };
 
-    async function fetchT(url, timeout = 15000, opts = {}) {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeout);
-        try {
-            return await fetch(url, { ...opts, credentials: 'include', signal: ctrl.signal });
-        } catch (e) {
-            if (e.name === 'AbortError') console.warn('[mrs] Timeout:', url);
-            return null;
-        } finally {
-            clearTimeout(t);
-        }
-    }
-
-    // --- In-flight Request Deduplication ---
-    const inflight = new Map();
-    const dedupeFetch = (key, fn) => {
-        if (inflight.has(key)) return inflight.get(key);
-        const p = fn().finally(() => inflight.delete(key));
-        inflight.set(key, p);
-        return p;
+    // Specialized memo for functions with a single string argument — avoids JSON.stringify overhead
+    const memoStr = (fn, maxSize = 500) => {
+        const cache = new Map();
+        return (s) => {
+            if (cache.has(s)) return cache.get(s);
+            const val = fn(s);
+            if (cache.size >= maxSize) cache.delete(cache.keys().next().value);
+            cache.set(s, val);
+            return val;
+        };
     };
 
+    // Parse Retry-After header from GM.xmlHttpRequest response headers
+    function parseRetryAfter(responseHeaders) {
+        if (!responseHeaders) return null;
+        const m = responseHeaders.match(/retry-after:\s*(\d+)/i);
+        return m ? parseInt(m[1], 10) * 1000 : null;
+    }
+
+    // Detect Cloudflare challenge pages (403/503 with cf markers)
+    function isCloudflareChallenge(status, text) {
+        if (status === 503) return true;
+        if (status === 403) {
+            if (!text) return false;
+            return text.includes('cf-challenge') ||
+                text.includes('cloudflare') ||
+                text.includes('cdn-cgi/challenge-platform') ||
+                text.includes('cf-mitigated');
+        }
+        return false;
+    }
+
+    async function fetchT(url, timeout = 15000, opts = {}) {
+        try {
+            const resp = await new Promise((resolve, reject) => {
+                const tid = setTimeout(() => reject(new DOMException('Timeout', 'AbortError')), timeout);
+                GM.xmlHttpRequest({
+                    method: opts.method || 'GET',
+                    url: url,
+                    headers: opts.headers || {},
+                    data: opts.body || null,
+                    timeout: timeout,
+                    onload: function (r) {
+                        clearTimeout(tid);
+                        resolve({
+                            ok: r.status >= 200 && r.status < 300,
+                            status: r.status,
+                            statusText: r.statusText || '',
+                            responseHeaders: r.responseHeaders || '',
+                            text: () => Promise.resolve(r.responseText),
+                            json: () => {
+                                try { return Promise.resolve(JSON.parse(r.responseText)); }
+                                catch (e) { return Promise.reject(e); }
+                            },
+                        });
+                    },
+                    onerror: function () {
+                        clearTimeout(tid);
+                        reject(new Error('GM.xmlHttpRequest failed'));
+                    },
+                    ontimeout: function () {
+                        clearTimeout(tid);
+                        reject(new DOMException('Timeout', 'AbortError'));
+                    },
+                });
+            });
+            return resp;
+        } catch (e) {
+            if (e.name === 'AbortError') console.warn('[mrs] Timeout:', url);
+            else console.error('[mrs] fetchT error:', e.message || e, 'url:', url);
+            return null;
+        }
+    }
     // --- Streaming Concurrency (asyncPool pattern) ---
     // Runs async functions with max concurrency, starts new ones as soon as any completes
     async function asyncPool(concurrency, items, worker) {
@@ -234,58 +290,173 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
 
         if (gradient > 0.95 && p.c < max) {
             p.c = Math.min(max, p.c + CONCURRENCY.UP);
-        } else if (gradient < 0.85 && p.c > 1) {
-            p.c = Math.max(1, p.c - CONCURRENCY.DOWN);
+        } else if (gradient < 0.85 && p.c > CONCURRENCY.MIN) {
+            p.c = Math.max(CONCURRENCY.MIN, p.c - CONCURRENCY.DOWN);
         }
     }
 
-    function probeFail(p) { p.c = Math.max(1, p.c - CONCURRENCY.DOWN); }
+    function probeFail(p) { p.c = Math.max(CONCURRENCY.MIN, p.c - CONCURRENCY.DOWN); }
 
-    const kpProbe = makeProbe(20, PLATFORM_MAX.kp);
-    const kpGqlProbe = makeProbe(20, PLATFORM_MAX.kpGql);
+    const kpGqlProbe = makeProbe(20, PLATFORM_MAX.kpGql); const pageBetweenDelay = { val: DELAY.PAGE_BETWEEN };
     const gqlProbe = makeProbe(20, PLATFORM_MAX.imdb);
     const lbProbe = makeProbe(20, PLATFORM_MAX.lb);
-    const kpDelay = { val: DELAY.KP_INIT }, gqlDelay = { val: DELAY.GQL_INIT }, lbDelay = { val: 50 };
+    const imdbProbe = makeProbe(20, PLATFORM_MAX.imdb);
+    const kpGqlDelay = { val: DELAY.GQL_INIT }, imdbGqlDelay = { val: DELAY.GQL_INIT };
 
-    const setStatus = (el, text) => { if (!el) return; el.style.display = 'block'; el.textContent = text; };
-
-    function renderResult(el, title, pairs, done) {
+    const clearStatus = (el) => {
+        if (!el) return;
+        if (el.__timerInterval) { clearInterval(el.__timerInterval); el.__timerInterval = null; }
         el.textContent = '';
-        const tb = document.createElement('b');
-        tb.textContent = title;
-        el.appendChild(tb);
-        for (const [l, v] of pairs) {
-            el.appendChild(document.createElement('br'));
-            el.appendChild(document.createTextNode(l));
-            const vb = document.createElement('b');
-            vb.textContent = String(v);
-            el.appendChild(vb);
+        el.style.display = 'none';
+        el.__progressBar = null;
+    };
+
+    const setStatus = (el, text, progress) => {
+        if (!el) return;
+        el.style.display = 'block';
+        if (!el.querySelector('.mrs-status__header')) {
+            el.textContent = '';
+            const header = document.createElement('div');
+            header.className = 'mrs-status__header';
+            const pulse = document.createElement('span');
+            pulse.className = 'mrs-pulse';
+            header.appendChild(pulse);
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'mrs-status__title';
+            header.appendChild(titleSpan);
+            const timerSpan = document.createElement('span');
+            timerSpan.className = 'mrs-status__timer';
+            header.appendChild(timerSpan);
+            el.appendChild(header);
+            const progressEl = document.createElement('div');
+            progressEl.className = 'mrs-status__progress';
+            const bar = document.createElement('div');
+            bar.className = 'mrs-status__progress-bar';
+            progressEl.appendChild(bar);
+            el.appendChild(progressEl);
+            el.__progressBar = bar;
+            el.__statusStart = Date.now();
+            if (!el.__timerInterval) {
+                el.__timerInterval = setInterval(() => {
+                    const timer = el.querySelector('.mrs-status__timer');
+                    if (timer && el.__statusStart) timer.textContent = formatElapsed(Date.now() - el.__statusStart);
+                }, 1000);
+            }
         }
+        const titleSpan = el.querySelector('.mrs-status__title');
+        if (titleSpan) titleSpan.textContent = text;
+        if (progress && el.__progressBar) {
+            const pct = Math.round((progress.current / progress.total) * 100);
+            el.__progressBar.style.width = pct + '%';
+        }
+    };
+
+    function renderResult(el, title, pairs, done, elapsedMs) {
+        if (el.__timerInterval) { clearInterval(el.__timerInterval); el.__timerInterval = null; }
+        el.textContent = '';
+        el.style.display = 'block';
+        const header = document.createElement('div');
+        header.className = 'mrs-status__header mrs-status__header--result';
+        const indicator = document.createElement('span');
+        indicator.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0;';
+        header.appendChild(indicator);
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'mrs-status__title';
+        titleSpan.textContent = title;
+        header.appendChild(titleSpan);
+        const pairsSpan = document.createElement('div');
+        pairsSpan.className = 'mrs-result-pairs';
+        for (const [label, value] of pairs) {
+            const pairEl = document.createElement('span');
+            pairEl.className = 'mrs-result-pair';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'mrs-result-label';
+            labelEl.textContent = label;
+            const valueEl = document.createElement('span');
+            valueEl.className = 'mrs-result-value';
+            valueEl.textContent = String(value);
+            pairEl.appendChild(labelEl);
+            pairEl.appendChild(valueEl);
+            pairsSpan.appendChild(pairEl);
+        }
+        header.appendChild(pairsSpan);
         if (done) {
-            el.appendChild(document.createElement('br'));
-            el.appendChild(document.createElement('br'));
-            el.appendChild(document.createTextNode(done));
+            const doneSpan = document.createElement('span');
+            doneSpan.style.color = '#10b981';
+            doneSpan.style.fontWeight = '600';
+            doneSpan.style.flexShrink = '0';
+            doneSpan.textContent = done;
+            header.appendChild(doneSpan);
         }
+        const timerSpan = document.createElement('span');
+        timerSpan.className = 'mrs-status__timer';
+        if (elapsedMs != null) timerSpan.textContent = `${t('time')}${formatElapsed(elapsedMs)}`;
+        header.appendChild(timerSpan);
+        el.appendChild(header);
+        const progress = document.createElement('div');
+        progress.className = 'mrs-status__progress';
+        const bar = document.createElement('div');
+        bar.className = 'mrs-status__progress-bar';
+        bar.style.width = '100%';
+        progress.appendChild(bar);
+        el.appendChild(progress);
     }
 
     // ====================== CSV ======================
 
     const csvEsc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const TITLE_DELIM = ' | ';
+    const escapeTitleDelim = s => String(s ?? '').replace(/\|/g, '\\|');
+    const unescapeTitleDelim = s => String(s ?? '').replace(/\\\|/g, '|');
+    const splitAllTitles = s => {
+        if (!s) return [];
+        const parts = [];
+        let current = '';
+        for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            if (ch === '\\' && i + 1 < s.length && s[i + 1] === '|') {
+                current += '|';
+                i++;
+            } else if (ch === '|') {
+                parts.push(current.trim());
+                current = '';
+            } else {
+                current += ch;
+            }
+        }
+        if (current.trim()) parts.push(current.trim());
+        return parts.filter(Boolean);
+    };
 
     function buildCSV(rows) {
         const first = rows[0] || {};
         const ext = first === rows[0] && (first.src || first.kpId !== undefined || first.ttId !== undefined || first.lbSlug !== undefined || first.titleRu !== undefined || first.titleOrig !== undefined);
+        const hasErrors = rows.some(r => r.error);
 
         if (ext) {
             const hasDates = rows.some(r => r.watchedDate);
-            const hdr = hasDates
-                ? 'TitleRu,TitleOrig,Type,KpId,TtId,LbSlug,YearStart,YearEnd,Rating10,Genres,WatchedDate'
-                : 'TitleRu,TitleOrig,Type,KpId,TtId,LbSlug,YearStart,YearEnd,Rating10,Genres';
+            const hasFav = rows.some(r => r.favorite);
+            const hasMeta = rows.some(r => r.runtime || r.directors || r.actors || r.premiereDate || r.genres);
+            let baseHdr = 'TitleRu,TitleOrig,AllTitles,Type,KpId,TtId,LbSlug,YearStart,YearEnd,Rating10,Genres';
+            if (hasMeta) baseHdr += ',Runtime,Directors,Actors,PremiereDate';
+            let hdr = hasDates && hasFav
+                ? baseHdr + ',Favorite,WatchedDate'
+                : hasDates
+                    ? baseHdr + ',WatchedDate'
+                    : hasFav
+                        ? baseHdr + ',Favorite'
+                        : baseHdr;
+            if (hasErrors) hdr += ',Error';
             const lines = [hdr, ...rows.map(r => {
                 const ratingVal = r.rating == null ? '' : r.rating;
-                const base = [
+                const favVal = r.favorite == null ? '' : (r.favorite ? '1' : '0');
+                const allTitles = Array.isArray(r.allTitles) && r.allTitles.length
+                    ? r.allTitles.map(escapeTitleDelim).join(TITLE_DELIM)
+                    : (r.allTitles || '');
+                let line = [
                     csvEsc(r.titleRu ?? ''),
                     csvEsc(r.titleOrig ?? r.title ?? ''),
+                    csvEsc(allTitles),
                     r.type ?? '',
                     r.kpId ?? '',
                     r.ttId ?? '',
@@ -295,24 +466,33 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                     ratingVal,
                     csvEsc(r.genres ?? ''),
                 ].join(',');
-                return hasDates ? `${base},${r.watchedDate ?? ''}` : base;
+                if (hasMeta) line += `,${csvEsc(r.runtime ?? '')},${csvEsc(r.directors ?? '')},${csvEsc(r.actors ?? '')},${csvEsc(r.premiereDate ?? '')}`;
+                if (hasDates && hasFav) line += `,${favVal},${r.watchedDate ?? ''}`;
+                else if (hasDates) line += `,${r.watchedDate ?? ''}`;
+                else if (hasFav) line += `,${favVal}`;
+                if (hasErrors) line += `,${csvEsc(r.error ?? '')}`;
+                return line;
             })];
             return lines.join('\n');
         }
 
         const hasDates = rows.some(r => r.watchedDate);
-        const hdr = hasDates ? 'Title,Year,Rating10,WatchedDate' : 'Title,Year,Rating10';
-        const lines = [hdr, ...rows.map(r =>
-            hasDates
+        let hdr = hasDates ? 'Title,Year,Rating10,WatchedDate' : 'Title,Year,Rating10';
+        if (hasErrors) hdr += ',Error';
+        const lines = [hdr, ...rows.map(r => {
+            let line = hasDates
                 ? `${csvEsc(r.title)},${r.year ?? ''},${r.rating ?? ''},${r.watchedDate ?? ''}`
-                : `${csvEsc(r.title)},${r.year ?? ''},${r.rating ?? ''}`
-        )];
+                : `${csvEsc(r.title)},${r.year ?? ''},${r.rating ?? ''}`;
+            if (hasErrors) line += `,${csvEsc(r.error ?? '')}`;
+            return line;
+        })];
         return lines.join('\n');
     }
 
     function downloadCSV(csv, name) {
+        // Use Blob parts to avoid concatenating BOM + entire CSV into one string
         const a = Object.assign(document.createElement('a'), {
-            href: URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })),
+            href: URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })),
             download: name,
         });
         a.click();
@@ -351,15 +531,18 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             const row = {};
             header.forEach((h, idx) => row[h] = cells[idx] ?? '');
             const unq = s => (s || '').replace(/""/g, '"');
-            const titleRu = unq(row.titleru);
-            const titleOrig = unq(row.titleorig);
+            const titleRu = decodeHtmlEntities(unq(row.titleru));
+            const titleOrig = decodeHtmlEntities(unq(row.titleorig));
             const cleanRu = cleanTitle(titleRu);
             const cleanOrig = cleanTitle(titleOrig);
+            const rawAllTitles = decodeHtmlEntities(unq(row.alltitles));
+            const allTitles = splitAllTitles(rawAllTitles);
             const rawRating = (row.rating10 === 'w' || row.rating10 === '') ? null : +row.rating10;
             result.push({
                 titleRu: cleanRu || titleRu,
                 titleOrig: cleanOrig || titleOrig,
                 title: cleanOrig || cleanRu || titleOrig || titleRu,
+                allTitles,
                 type: (row.type || '').trim(),
                 kpId: (row.kpid || '').trim(),
                 ttId: (row.ttid || '').trim(),
@@ -370,14 +553,21 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                 rating: Number.isNaN(rawRating) ? null : rawRating,
                 genres: unq(row.genres),
                 watchedDate: (row.watcheddate || '').trim(),
+                favorite: (row.favorite || '').trim() === '1',
+                runtime: (row.runtime || '').trim(),
+                directors: decodeHtmlEntities(unq(row.directors)),
+                actors: decodeHtmlEntities(unq(row.actors)),
+                premiereDate: (row.premieredate || '').trim(),
                 src: (row.src || '').trim(),
             });
         }
-        if (skipped.length) console.warn(`[mrs] CSV: ${skipped.length} строк не распознано:`, skipped.slice(0, 10));
+        if (skipped.length) console.warn(`[mrs] CSV: ${skipped.length} rows not recognized:`, skipped.slice(0, 10));
         return result;
     }
 
     function parseCSV(text) {
+        // Strip BOM if present (common in CSVs exported from IMDb/Letterboxd)
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
         const lines = text.trim().split(/\r?\n/);
         if (lines.length < 2) return [];
         const hdrLine = lines[0].toLowerCase();
@@ -396,11 +586,11 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             if (!l) return [];
             const m = hasDates ? l.match(RE_DATE) : l.match(RE_PLAIN);
             if (!m) { skipped.push(l); return []; }
-            const title = cleanTitle(m[1].replace(/""/g, '"').trim());
+            const title = cleanTitle(decodeHtmlEntities(m[1].replace(/""/g, '"').trim()));
             const rawRating = (m[3] === 'w' || m[3] === '') ? null : +m[3];
             return [{ title, year: m[2] ?? '', rating: rawRating, ...(hasDates && { watchedDate: m[4] ?? '' }) }];
         });
-        if (skipped.length) console.warn(`[mrs] CSV: ${skipped.length} строк не распознано:`, skipped.slice(0, 10));
+        if (skipped.length) console.warn(`[mrs] CSV: ${skipped.length} rows not recognized:`, skipped.slice(0, 10));
         return result;
     }
 
@@ -411,18 +601,438 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
     };
 
-    const hasCyr = memo(s => /[а-яА-ЯёЁ]/.test(s));
-    const translit = memo(s => s.split('').map(c => CYR[c] ?? c).join(''));
-    const normTitle = memo(s => s.toLowerCase().replace(/[\-–—.,!?'"«»()\[\]\\\/]/g, ' ').replace(/\s+/g, ' ').trim());
-    const cleanTitle = memo(t => {
-        const m = t.match(/\((.+?),\s*\d{4}(?:-\d{4})?\)$/);
-        return m ? m[1].trim() : t.replace(/,\s*\d{4}(?:-\d{4})?\s*$/, '').replace(/[«»]/g, '').trim();
+    const hasCyr = memoStr(s => /[а-яА-ЯёЁ]/.test(s));
+    // Characters unique to non-Russian Cyrillic alphabets:
+    // Serbian: ђ ј љ њ ћ џ | Ukrainian: є і ї ґ
+    // Serbian: ђ ј љ њ ћ џ | Ukrainian: є і ї ґ | Belarusian: ў | Macedonian: ѓ ќ ѕ
+    const NON_RUSSIAN_CYR = /[ђѓєѕіїјљњћќўџґЂЃЄЅІЇЈЉЊЋЌЎЏҐ]/;
+    const isRussianCyrillic = memoStr(s => {
+        if (!hasCyr(s)) return false;
+        if (NON_RUSSIAN_CYR.test(s)) return false;
+        return true;
     });
-    const yearsMatch = memo((a, b) => {
-        const ya = parseInt(String(a).match(/^(\d{4})/)?.[1], 10), yb = parseInt(b, 10);
-        return !isNaN(ya) && !isNaN(yb) && Math.abs(ya - yb) <= YEAR_TOL;
-    });
+    const translit = memoStr(s => s.split('').map(c => CYR[c] ?? c).join(''));
+    const normalizeNumerals = memoStr(s => s
+        // Superscript numerals may be attached to words (e.g. Alien³). Insert spaces first.
+        .replace(/³/g, ' 3 ')
+        .replace(/²/g, ' 2 ')
+        .replace(/\b(?:iii|3)\b/g, '3')
+        .replace(/\b(?:ii|2)\b/g, '2')
+        .replace(/\b(?:iv|4)\b/g, '4')
+        .replace(/\b(?:v|5)\b/g, '5')
+        .replace(/\b(?:vi|6)\b/g, '6')
+        .replace(/\b(?:vii|7)\b/g, '7')
+        .replace(/\b(?:viii|8)\b/g, '8')
+        .replace(/\b(?:ix|9)\b/g, '9')
+        .replace(/\b(?:x|10)\b/g, '10')
+        .replace(/\b(?:xi|11)\b/g, '11')
+        .replace(/\b(?:xii|12)\b/g, '12')
+        .replace(/\b(?:xiii|13)\b/g, '13'));
 
+    // Numeric words that differ between KP and IMDb titles (e.g. "Se7en" vs "Seven", "8 Mile" vs "Eight Mile").
+    const NUM_WORDS = {
+        '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four', '5': 'five',
+        '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine', '10': 'ten',
+        '11': 'eleven', '12': 'twelve', '13': 'thirteen', '14': 'fourteen', '15': 'fifteen',
+        '16': 'sixteen', '17': 'seventeen', '18': 'eighteen', '19': 'nineteen', '20': 'twenty',
+        '21': 'twentyone', '22': 'twentytwo', '23': 'twentythree', '24': 'twentyfour', '25': 'twentyfive',
+        '26': 'twentysix', '27': 'twentyseven', '28': 'twentyeight', '29': 'twentynine', '30': 'thirty',
+        '40': 'forty', '50': 'fifty', '60': 'sixty', '70': 'seventy', '80': 'eighty', '90': 'ninety',
+        '100': 'onehundred', '200': 'twohundred', '300': 'threehundred', '500': 'fivehundred',
+        '1000': 'onethousand', '2000': 'twothousand', '2010': 'twothousandten', '2020': 'twothousandtwenty',
+    };
+    const normTitle = memoStr(s => {
+        let n = s.replace(/№/g, ' no ')
+            // Superscript numerals may be attached to words (e.g. Alien³). Insert spaces before NFKD normalization.
+            .replace(/³/g, ' 3 ')
+            .replace(/²/g, ' 2 ')
+            .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+            .toLowerCase()
+            .replace(/&/g, ' and ')
+            .replace(/œ/g, 'oe')
+            .replace(/æ/g, 'ae');
+        n = normalizeNumerals(n);
+        // Expand standalone numerals into words ("se7en" → "seven", "8 mile" → "eight mile").
+        // Only standalone digits (not years/IDs) to avoid turning "1984" into "one nine eight four".
+        n = n.replace(/(^|[^\p{L}\p{N}])[0-9]{1,2}([^\p{L}\p{N}]|$)/gu, (m, pre, post) => {
+            const d = m.replace(/[^0-9]/g, '');
+            const w = NUM_WORDS[d];
+            return w ? pre + w + post : m;
+        });
+        return n
+            .replace(/[\-–—.,!?;:'"«»()\[\]\/]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/\b(the|a|an|and|le|la|les|un|une|el|los|las|der|die|das|il|lo|gli|de|het|en|et|e)\b/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    });
+    const cleanTitle = memoStr(t => {
+        const m = t.match(/\((.+?)(?:,\s*\d{4}(?:-\d{4})?)\)$/);
+        let res = m ? m[1].trim() : t
+            .replace(/,\s*\d{4}(?:-\d{4})?\s*$/, '')        // "Title, 1999"
+            .replace(/[,]?\s*\(\d{4}(?:-\d{4})?\)\s*$/, '') // "Title (1999)"
+            .replace(/[«»]/g, '').trim();
+        // Strip slug-style year suffix (e.g., dune-2021 → dune)
+        res = res.replace(/-\d{4}$/, '').trim();
+        return res;
+    });
+    const __dedupeMap = new Map();
+    function dedupeFetch(key, factory) {
+        if (__dedupeMap.has(key)) return __dedupeMap.get(key);
+        const p = factory().finally(() => __dedupeMap.delete(key));
+        __dedupeMap.set(key, p);
+        return p;
+    }
+
+    function decodeHtmlEntities(str) {
+        if (!str || typeof str !== 'string') return str;
+        return str
+            .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(+code))
+            .replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'");
+    }
+
+    // Extract schema.org Movie/TVSeries metadata from HTML JSON-LD blocks.
+    function extractSchemaOrg(html, pageUrl, doc) {
+        if (!html && !doc) return null;
+        // Use DOM parsing to find JSON-LD blocks regardless of attribute order or quotes.
+        if (!doc) doc = new DOMParser().parseFromString(html, 'text/html');
+        const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+        const candidates = [];
+        for (const script of scripts) {
+            try {
+                let raw = (script.textContent || '').trim().replace(/\u0000/g, '');
+                // Strip CDATA markers and HTML comments that some sites wrap around JSON-LD.
+                raw = raw.replace(/\/\*[\s\S]*?<!\[CDATA\[[\s\S]*?\*\//g, '').replace(/\/\*[\s\S]*?\]\]>\s*\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').trim();
+                if (!raw) continue;
+                const data = JSON.parse(raw);
+                const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
+                for (const item of items) {
+                    if (item && (item['@type'] === 'Movie' || item['@type'] === 'TVSeries' || item['@type'] === 'TVEpisode')) {
+                        candidates.push(item);
+                    }
+                }
+            } catch (e) { /* ignore malformed JSON-LD */ }
+        }
+        if (!candidates.length) return null;
+        // Prefer the block whose url matches the current page, otherwise the first one.
+        const pagePath = (pageUrl || '').split('?')[0].replace(/#$/, '');
+        const movie = candidates.find(i => i.url && pagePath && (i.url === pageUrl || i.url === pagePath)) || candidates[0];
+
+        const altTitles = [];
+        const pushAlt = (val) => {
+            if (!val) return;
+            if (Array.isArray(val)) { for (const v of val) pushAlt(v); return; }
+            if (typeof val === 'string') altTitles.push(val);
+        };
+        pushAlt(movie.alternateName);
+        pushAlt(movie.alternativeHeadline);
+        if (Array.isArray(movie.name)) {
+            for (const n of movie.name) pushAlt(n);
+        }
+
+        const parseList = (field) => {
+            if (!field) return '';
+            const arr = Array.isArray(field) ? field : [field];
+            return arr.filter(Boolean).map(x => (typeof x === 'string' ? x : x.name || x.text || '')).filter(Boolean).join(', ');
+        };
+        const directorNames = [parseList(movie.director), parseList(movie.creator)].filter(Boolean).join(', ');
+
+        const duration = movie.duration || movie.timeRequired || '';
+        let runtime = '';
+        if (typeof duration === 'number') runtime = String(duration);
+        else if (typeof duration === 'string') {
+            const dm = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+            if (dm) runtime = String((parseInt(dm[1] || 0) * 60) + parseInt(dm[2] || 0));
+        }
+
+        return {
+            title: decodeHtmlEntities((Array.isArray(movie.name) ? movie.name.find(n => typeof n === 'string') : movie.name) || ''),
+            altTitles: [...new Set(altTitles.filter(Boolean).map(decodeHtmlEntities))],
+            directors: decodeHtmlEntities(directorNames),
+            actors: decodeHtmlEntities(parseList(movie.actor)),
+            genres: decodeHtmlEntities(parseList(movie.genre)),
+            countries: decodeHtmlEntities(parseList(movie.countryOfOrigin)),
+            runtime,
+            premiereDate: movie.datePublished || movie.dateCreated || '',
+        };
+    }
+
+    // ====================== SEARCH & SCORING HELPERS ======================
+
+    // --- Year matching with tolerance (YEAR_TOL=1) ---
+    const yearsMatch = (a, b) => {
+        if (!a || !b) return true;
+        const parseY = s => {
+            const m = String(s).match(/(\d{4})/);
+            return m ? parseInt(m[1], 10) : null;
+        };
+        const ya = parseY(a);
+        const yb = parseY(b);
+        if (ya == null || yb == null) return true;
+        return Math.abs(ya - yb) <= YEAR_TOL;
+    };
+
+    // --- Generate title variants for search ---
+    // Uses original title, alternative titles, localized titles, and transliterations
+    function getTitleVariants(title, allTitles = []) {
+        const set = new Set();
+        const add = t => {
+            const v = String(t ?? '').trim();
+            if (!v || v.length < 1) return;
+            set.add(v);
+            const cleaned = cleanTitle(v);
+            if (cleaned && cleaned !== v && cleaned.length > 1) set.add(cleaned);
+            if (hasCyr(v)) {
+                const tr = translit(v);
+                if (tr !== v) { set.add(tr); set.add(normTitle(tr)); }
+            }
+            set.add(normTitle(v));
+        };
+        add(title);
+        if (Array.isArray(allTitles)) {
+            for (const alt of allTitles) {
+                add(alt);
+                if (set.size >= 12) break; // Early exit: don't process hundreds of titles
+            }
+        }
+        // Limit to first 10 unique variants
+        return [...set].filter(Boolean).slice(0, 10);
+    }
+
+    // --- Extract series parent from episode title ---
+    // Handles patterns like "Series: Episode" or "Series - Episode"
+    function extractSeriesParent(title) {
+        if (!title || typeof title !== 'string') return null;
+        const m = title.match(/^(.+?)\s*[:\u2013\u2014\u2015]\s*.+/);
+        if (m) {
+            const parent = m[1].trim();
+            if (parent && parent.length > 1 && parent !== title) return parent;
+        }
+        // Also try with dash pattern
+        const m2 = title.match(/^(.+?)\s*-\s+[A-Z]/);
+        if (m2) {
+            const parent = m2[1].trim();
+            if (parent && parent.length > 1 && parent !== title) return parent;
+        }
+        return null;
+    }
+
+    // --- Additive scoring for candidate matching ---
+    // Weights based on reliability of each data field
+    // extraTitles: additional query variants (transliterations, alt titles) used to find the candidate.
+
+    // Normalize a type string (IMDb qid / KP CSV type) into a coarse family.
+    function typeFamily(t) {
+        const s = String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!s) return '';
+        if (/tvmovie/.test(s)) return 'tvmovie';
+        if (/movie|feature|film/.test(s)) return 'movie';
+        if (/series|mini/.test(s)) return 'series';
+        if (/short/.test(s)) return 'short';
+        if (/video/.test(s)) return 'video';
+        if (/music/.test(s)) return 'music';
+        if (/special/.test(s)) return 'special';
+        if (/episode/.test(s)) return 'episode';
+        if (/doc/.test(s)) return 'doc';
+        return s;
+    }
+
+    // Derivative works (making-ofs, trailers, music videos, TV specials, episodes) that must NEVER
+    // win via a weak substring match — a plain film row would otherwise map to "The Making of X".
+    const DERIVATIVE_TYPES = new Set(['video', 'music', 'special', 'episode', 'doc', 'tvmovie']);
+
+    function scoreCandidate(source, candidate, extraTitles = []) {
+        let score = 0;
+        const parts = [];
+
+        // 1. External IDs (highest priority)
+        if (candidate.ttId && source.ttId && candidate.ttId === source.ttId) {
+            score += 1000; parts.push('+1000 IMDb ID');
+        }
+
+        // 2. Original Title Exact
+        const srcTitle = source.titleOrig || source.titleRu || source.title || '';
+        const candTitle = candidate.titleOrig || candidate.titleRu || candidate.title || '';
+        const nCand = normTitle(candTitle);
+        // All title variants to compare against: primary + allTitles + translit + extraTitles
+        const titlePool = [srcTitle];
+        if (Array.isArray(source.allTitles)) titlePool.push(...source.allTitles);
+        if (hasCyr(srcTitle)) titlePool.push(translit(srcTitle));
+        titlePool.push(...extraTitles.filter(Boolean));
+        let titleMatched = false;
+        let titleKind = ''; // 'exact' | 'substring' | ''
+        // Exact match against any variant
+        for (const t of titlePool) {
+            const n = normTitle(t);
+            if (n && n === nCand) {
+                score += 500; parts.push('+500 Title');
+                titleMatched = true; titleKind = 'exact';
+                break;
+            }
+        }
+        // Clean-title match (strips years, quotes, etc.)
+        if (!titleMatched) {
+            const cCand = cleanTitle(candTitle);
+            for (const t of titlePool) {
+                const c = cleanTitle(t);
+                if (c && cCand && normTitle(c) === normTitle(cCand)) {
+                    score += 480; parts.push('+480 Clean Title');
+                    titleMatched = true; titleKind = 'exact';
+                    break;
+                }
+            }
+        }
+
+        // Substring/includes match (e.g. Leon in Leon: The Professional).
+        // Denied for derivative types — a film row must not map to "The Making of X" / "X: Interviews" / trailers.
+        if (!titleMatched && nCand && !DERIVATIVE_TYPES.has(typeFamily(candidate.type))) {
+            for (const t of titlePool) {
+                const n = normTitle(t);
+                if (n && n.length >= 3 && nCand.length >= 3 && (nCand.includes(n) || n.includes(nCand))) {
+                    score += 350; parts.push('+350 Substring Title');
+                    titleMatched = true; titleKind = 'substring';
+                    break;
+                }
+            }
+        }
+
+        // 3. Alternative Title Exact (legacy path; titlePool already covers allTitles)
+        if (!titleMatched && source.allTitles && source.allTitles.length && nCand) {
+            for (const alt of source.allTitles) {
+                const nAlt = normTitle(alt);
+                if (nAlt === nCand) {
+                    score += 450; parts.push('+450 Alt Title');
+                    titleMatched = true; titleKind = 'exact';
+                    break;
+                }
+            }
+        }
+
+        // 4. Russian title match (for KP)
+        if (!titleMatched && source.titleRu && candidate.titleRu) {
+            if (normTitle(source.titleRu) === normTitle(candidate.titleRu)) {
+                score += 400; parts.push('+400 Russian Title');
+                titleMatched = true; titleKind = 'exact';
+            }
+        }
+
+        // 2b. Suggest rank bonus: candidate was the TOP result AND year matches — strong signal,
+        // even for substring matches (e.g. the real "Rogue One: A Star Wars Story" is rank 0 for "Rogue One",
+        // while the fan-edit "Rogue One" (2017) only gets an exact-title-but-wrong-year match).
+        if (titleKind !== 'exact' && candidate.suggestRank === 0 && source.year && candidate.year && yearsMatch(candidate.year, source.year)) {
+            score += 280; parts.push('+280 Top Suggest + Year');
+        }
+
+        // 5. Year
+        if (source.year && candidate.year) {
+            const sYr = String(source.year).match(/\d{4}/);
+            const cYr = String(candidate.year).match(/\d{4}/);
+            if (sYr && cYr) {
+                const y1 = parseInt(sYr[0], 10), y2 = parseInt(cYr[0], 10);
+                if (y1 === y2) { score += 300; parts.push('+300 Year Exact'); }
+                else if (Math.abs(y1 - y2) <= YEAR_TOL) { score += 250; parts.push('+250 Year +/-1'); }
+            }
+        }
+
+        // 6. Type — family-based scoring (KP "Film" ↔ IMDb "movie", KP "TvSeries" ↔ "tvSeries").
+        // No hard rejections: KP often mislabels series as Film (e.g. "The Thick of It"), so a series
+        // candidate for a Film source is allowed (it just gets no bonus and must rely on title+year).
+        const sf = typeFamily(source.type);
+        const cf = typeFamily(candidate.type);
+        if (sf && cf) {
+            if (sf === cf || (sf === 'movie' && cf === 'tvmovie') || (sf === 'tvmovie' && cf === 'movie')) {
+                score += 200; parts.push('+200 Type');
+            }
+        }
+
+        // 6b. Short-film safety: a KP row whose genre says "короткометражка" (short film) must not
+        // silently map to a feature with the same name (e.g. Saw (2003 short) vs Saw (2004 feature)).
+        if (cf && cf !== 'short' && cf !== 'series') {
+            const srcGenres = String(source.genres || '').toLowerCase();
+            if (sf === 'short' || srcGenres.includes('короткометражка')) {
+                const yExact = !!(source.year && candidate.year &&
+                    String(source.year).match(/\d{4}/)?.[0] === String(candidate.year).match(/\d{4}/)?.[0]);
+                // Same-name feature with the exact year is likely the intended film; any other year is
+                // almost certainly a different work (the user rated the short).
+                score -= yExact ? 200 : 650;
+                parts.push(yExact ? '-200 Short-source year-exact' : '-650 Short-source vs ' + cf);
+            }
+        }
+
+        // 7. Director
+        if (candidate.directors && source.directors) {
+            const sDirs = source.directors.split(',').map(d => normTitle(d.trim())).filter(Boolean);
+            const cDirs = candidate.directors.split(',').map(d => normTitle(d.trim())).filter(Boolean);
+            if (sDirs.length && cDirs.length && sDirs.some(sd => cDirs.some(cd => cd.includes(sd) || sd.includes(cd)))) {
+                score += 150; parts.push('+150 Director');
+            }
+        }
+
+        // 8. Runtime (graduated scoring)
+        if (candidate.runtime && source.runtime) {
+            const sR = parseInt(source.runtime, 10);
+            const cR = parseInt(candidate.runtime, 10);
+            if (sR > 0 && cR > 0) {
+                const diff = Math.abs(sR - cR);
+                if (diff <= 2) { score += 80; parts.push('+80 Runtime'); }
+                else if (diff <= 5) { score += 60; parts.push('+60 Runtime'); }
+                else if (diff <= 10) { score += 40; parts.push('+40 Runtime'); }
+                else if (diff <= 15) { score += 20; parts.push('+20 Runtime'); }
+            }
+        }
+
+        // 9. Country
+        if (candidate.countries && source.countries) {
+            const sCountries = source.countries.toLowerCase();
+            const cList = candidate.countries.split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+            if (cList.some(c => sCountries.includes(c))) {
+                score += 60; parts.push('+60 Country');
+            }
+        }
+
+        // 10. Genres (max 3, graduated)
+        if (candidate.genres && source.genres) {
+            const sGenres = source.genres.toLowerCase().split(/[,;]/).map(g => g.trim()).filter(Boolean);
+            const cGenres = candidate.genres.toLowerCase().split(/[,;]/).map(g => g.trim()).filter(Boolean);
+            let gCount = 0;
+            for (const sg of sGenres) {
+                if (gCount >= 3) break;
+                if (cGenres.some(cg => cg.includes(sg) || sg.includes(cg))) {
+                    score += 20; parts.push('+20 Genre');
+                    gCount++;
+                }
+            }
+        }
+
+        // 11. Actors (max 3)
+        if (candidate.actors && source.actors) {
+            const sActors = source.actors.toLowerCase().split(/[,;]/).map(a => a.trim()).filter(Boolean);
+            const cActors = candidate.actors.toLowerCase().split(/[,;]/).map(a => a.trim()).filter(Boolean);
+            let aCount = 0;
+            for (const sa of sActors) {
+                if (aCount >= 3) break;
+                if (cActors.some(ca => ca.includes(sa) || sa.includes(ca))) {
+                    score += 10; parts.push('+10 Actor');
+                    aCount++;
+                }
+            }
+        }
+
+        DEBUG && parts.length && console.log(`[mrs] Score: ${score} for "${srcTitle}" (${source.year || '?'}) — ${parts.join(', ')}`);
+        return score;
+    }
+
+    // --- Confidence label based on total score ---
+    function confidenceLabel(score) {
+        if (score >= 800) return 'high';
+        if (score >= 500) return 'medium';
+        return 'low';
+    }
     // ====================== KP MODULE ======================
 
     function getKPUserId() {
@@ -433,6 +1043,50 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             const pp = d?.props?.pageProps;
             return String(pp?.user?.id ?? pp?.userData?.id ?? pp?.requestContext?.user?.id ?? pp?.currentUser?.id ?? '') || null;
         } catch { return null; }
+    }
+
+    async function resolveKPUserId(statusEl) {
+        let uid = getKPUserId();
+        if (uid) return uid;
+
+        // Try to fetch the profile page in the background
+        setStatus(statusEl, 'Detecting Kinopoisk profile...');
+        const profileUrls = [
+            'https://www.kinopoisk.ru/api/profile',
+            'https://www.kinopoisk.ru/mykp/movies/',
+            'https://www.kinopoisk.ru/',
+        ];
+        for (const url of profileUrls) {
+            try {
+                const r = await fetchT(url, 10000);
+                if (!r?.ok) continue;
+                const text = await r.text();
+                // Look for user ID in various patterns
+                const patterns = [
+                    /\/user\/(\d+)/,
+                    /"userId":\s*":?\s*(\d+)/,
+                    /"user":\s*\{[^}]*"id":\s*":?\s*(\d+)/,
+                    /"id":"(\d+)"/,
+                    /\/user\/(\d+)/,
+                ];
+                for (const re of patterns) {
+                    const m = text.match(re);
+                    if (m) {
+                        uid = m[1];
+                        break;
+                    }
+                }
+                if (uid) break;
+            } catch (e) { console.warn('[mrs] KP profile fetch error:', e.message); }
+        }
+
+        if (!uid) {
+            // Last resort: navigate to profile page
+            console.warn('[mrs] Could not detect KP user ID, navigating to profile page');
+            window.location.href = 'https://www.kinopoisk.ru/mykp/movies/';
+            throw new Error(t('kpUserIdNotFound'));
+        }
+        return uid;
     }
 
     function parseKPSSRJson(doc) {
@@ -511,7 +1165,7 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             } else if (movie.productionYear) {
                 yearStart = String(movie.productionYear);
             }
-            let rating = null, watched = false;
+            let rating = null, watched = false, favorite = false;
             const reactionsEntry = Object.entries(item).find(([k]) => k.startsWith('reactions'));
             const reactions = reactionsEntry ? reactionsEntry[1] : [];
             for (const r of reactions) {
@@ -520,6 +1174,7 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                 if (!rObj) continue;
                 if (rObj.__typename === 'Vote' && rObj.value != null) rating = rObj.value;
                 else if (rObj.__typename === 'Watched') watched = true;
+                else if (rObj.__typename === 'Favorite') favorite = true;
             }
             let genres = '';
             if (movie.genres?.length) {
@@ -530,12 +1185,12 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                 }).filter(Boolean).join(', ');
             }
             results.push({
-                titleRu: movie.title?.russian || '',
-                titleOrig: movie.title?.original || '',
+                titleRu: decodeHtmlEntities(movie.title?.russian || ''),
+                titleOrig: decodeHtmlEntities(movie.title?.original || ''),
                 type: isSeries ? 'TvSeries' : 'Film',
                 kpId: String(movie.id),
                 yearStart, yearEnd,
-                rating, watched,
+                rating, watched, favorite,
                 genres,
             });
         }
@@ -567,11 +1222,12 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             const ratingText = ratingEl?.textContent?.trim() || '';
             const rating = /^\d+$/.test(ratingText) ? +ratingText : null;
             results.push({
-                titleRu, titleOrig: '',
+                titleRu, titleOrig: (() => { if (!subtitle || hasCyr(subtitle)) return ''; const s = subtitle.replace(/^\d{4},\s*/, '').split(',')[0].trim(); return /^\d{4}$/.test(s) ? '' : s; })(),
                 type: match[1] === 'series' ? 'TvSeries' : 'Film',
                 kpId: match[2],
                 yearStart: year, yearEnd: '',
                 rating, watched: rating == null,
+                favorite: false,
                 genres: '',
             });
         }
@@ -581,29 +1237,40 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
     async function fetchDocTimed(url) {
         const t0 = Date.now();
         const resp = await fetchT(url, 15000);
-        const time = Date.now() - t0;
-        if (!resp?.ok) return { doc: null, time };
+        if (!resp) return { doc: null };
+        if (resp.status === 429) {
+            const ra = parseRetryAfter(resp.responseHeaders);
+            if (ra) { await sleep(ra); }
+            else { adjDelay(pageBetweenDelay, '429'); }
+            DEBUG && console.log('[mrs] 429 on ' + url + ', page delay ' + pageBetweenDelay.val + 'ms');
+            return { doc: null };
+        }
+        if (!resp.ok) {
+            adjDelay(pageBetweenDelay, 'error');
+            return { doc: null };
+        }
+        adjDelay(pageBetweenDelay, 'ok', Date.now() - t0);
         const doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
-        return { doc, time };
+        return { doc };
     }
 
     async function performKPExport(statusEl) {
-        const uid = getKPUserId();
+        const kpExportStart = Date.now();
+        const uid = await resolveKPUserId(statusEl);
         if (!uid) throw new Error(t('kpUserIdNotFound'));
 
         const baseUrl = `https://www.kinopoisk.ru/user/${uid}/movies/voted-watched`;
-        let allItems = [], totalPages = 0, ssrHits = 0, consecutiveEmpty = 0;
-        const stats = { pages: 0, ssr: 0, fallback: 0, retries: 0, maxConsecutiveEmpty: 0 };
+        let allItems = [], totalPages = 0;
+        const stats = { pages: 0, ssr: 0, fallback: 0, retries: 0 };
 
-        for (let p = 1; p <= 2000; p++) {
-            setStatus(statusEl, t('loadingPage', {p: p, total: (totalPages ? '/' + totalPages : ''), count: allItems.length}));
-
+        // Fetch page 1 first to discover totalPages
+        setStatus(statusEl, t('loadingPage', { p: 1, total: '', count: 0 }) + dots());
+        {
             let items = [];
-            let usedFallback = false;
             for (let attempt = 1; attempt <= 3; attempt++) {
-                const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
+                const { doc } = await fetchDocTimed(`${baseUrl}/?page=1`);
                 if (!doc) break;
-                if (p === 1 && !totalPages) {
+                if (!totalPages) {
                     for (const a of doc.querySelectorAll('a[href*="?page="], a[href*="&page="]')) {
                         const m = a.href.match(/[?&]page=(\d+)/);
                         if (m) totalPages = Math.max(totalPages, +m[1]);
@@ -611,35 +1278,78 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                 }
                 items = parseKPListingPage(doc);
                 if (items.length > 0) break;
-                if (attempt < 3) {
-                    stats.retries++;
-                    await sleep(800 * attempt);
-                }
+                if (attempt < 3) { stats.retries++; await sleep(800 * attempt); }
             }
-
-            if (items.length === 0) {
-                consecutiveEmpty++;
-                stats.maxConsecutiveEmpty = Math.max(stats.maxConsecutiveEmpty, consecutiveEmpty);
-                if (p === 1) throw new Error(t('kpParseFailed'));
-                if (consecutiveEmpty >= 3) break;
-                continue;
-            }
-            consecutiveEmpty = 0;
+            if (items.length === 0) throw new Error(t('kpParseFailed'));
             stats.pages++;
-            if (items[0].titleOrig !== undefined && items[0].genres !== undefined) { ssrHits++; stats.ssr++; }
+            if (items[0].titleOrig !== undefined && items[0].genres !== undefined) stats.ssr++;
             else stats.fallback++;
             allItems = allItems.concat(items);
-            if (totalPages && p >= totalPages) break;
-            await sleep(DELAY.PAGE_BETWEEN);
+        }
+
+        // Fetch remaining pages in parallel
+        if (totalPages > 1) {
+            const pageNums = [];
+            for (let p = 2; p <= totalPages; p++) pageNums.push(p);
+            const pageResults = await asyncPool(10, pageNums, async (p) => {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
+                    if (!doc) break;
+                    const items = parseKPListingPage(doc);
+                    if (items.length > 0) {
+                        return { page: p, items };
+                    }
+                    if (attempt < 3) { stats.retries++; await sleep(800 * attempt); }
+                }
+                return { page: p, items: [] };
+            });
+            for (const r of pageResults) {
+                if (r.status === 'fulfilled' && r.value && r.value.items.length) {
+                    const v = r.value;
+                    stats.pages++;
+                    if (v.items[0].titleOrig !== undefined && v.items[0].genres !== undefined) stats.ssr++;
+                    else stats.fallback++;
+                    allItems = allItems.concat(v.items);
+                }
+            }
+            setStatus(statusEl, t('loadingPage', { p: totalPages, total: '/' + totalPages, count: allItems.length }));
         }
 
         if (allItems.length === 0) throw new Error(t('kpListingFailed'));
 
         const unique = [...new Map(allItems.map(i => [i.kpId, i])).values()];
-        console.log(`[mrs] KP export: ${unique.length} фильмов, страниц: ${totalPages || '?'}, SSR: ${stats.ssr}, fallback: ${stats.fallback}, retries: ${stats.retries}, maxConsecutiveEmpty: ${stats.maxConsecutiveEmpty}`);
+
+        // Fetch film details from Kinopoisk film pages
+        setStatus(statusEl, `Fetching film details for ${unique.length} films...` + dots());
+        const kpRateLimit = makeRateLimiter(15);
+        const kpDetailResults = await asyncPool(20, unique, async i => {
+            if (!i.kpId) return null;
+            const cacheKey = 'kp:' + i.kpId;
+            const cached = filmDetailCache.get(cacheKey);
+            if (cached) return cached;
+            await kpRateLimit();
+            const result = await kpFetchFilmDetailsHTML(i.kpId);
+            if (result) filmDetailCache.set(cacheKey, result);
+            return result;
+        });
+        kpDetailResults.forEach((r, i) => {
+            const item = unique[i];
+            if (r.status === 'fulfilled' && r.value) {
+                item.allTitles = [...new Set([item.titleRu, item.titleOrig, ...(item.allTitles || []), ...r.value.allTitles.map(decodeHtmlEntities)].filter(Boolean))];
+                item.runtime = r.value.runtime;
+                item.directors = r.value.directors;
+                item.actors = r.value.actors;
+                item.genres = r.value.genres;
+                item.premiereDate = r.value.premiereDate;
+            }
+        });
+        filmDetailCache.flush();
+        const kpExportElapsed = Date.now() - kpExportStart;
+        DEBUG && console.log(`[mrs] KP export: ${unique.length} ${t('movies')}, pages: ${totalPages || '?'}, SSR: ${stats.ssr}, fallback: ${stats.fallback}, retries: ${stats.retries}, time: ${formatElapsed(kpExportElapsed)}`);
         return buildCSV(unique.map(i => ({
             titleRu: i.titleRu || '',
             titleOrig: i.titleOrig || '',
+            allTitles: [...new Set([i.titleRu, i.titleOrig, ...(i.allTitles || [])].filter(Boolean))],
             type: i.type || '',
             kpId: i.kpId || '',
             ttId: '',
@@ -648,16 +1358,44 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             yearEnd: i.yearEnd || '',
             rating: i.rating == null ? (i.watched ? 'w' : '') : i.rating,
             genres: i.genres || '',
+            runtime: i.runtime || '',
+            directors: i.directors || '',
+            actors: i.actors || '',
+            premiereDate: i.premiereDate || '',
+            favorite: i.favorite || false,
             src: 'kp',
         })));
     }
 
     // ----- KP GQL -----
+    // TODO: Batch GQL queries via aliases to reduce request count for large libraries.
+    // e.g. query { t1: film(id:1){...} t2: film(id:2){...} } — needs API testing.
+    // Risk: API may not support batching or may have alias limits.
 
     const KP_SUGGEST_QUERY = `query SuggestSearch($keyword: String!, $yandexCityId: Int, $limit: Int, $withUserData: Boolean!) { suggest(keyword: $keyword) { top(yandexCityId: $yandexCityId, limit: $limit) { topResult { global { ...SuggestMovieItem ...SuggestPersonItem ...SuggestCinemaItem ...SuggestMovieListItem __typename } __typename } movies { movie { ...SuggestMovieItem __typename } __typename } persons { person { ...SuggestPersonItem __typename } __typename } cinemas { cinema { ...SuggestCinemaItem __typename } __typename } movieLists { movieList { ...SuggestMovieListItem __typename } __typename } __typename } __typename } } fragment ShortImage on Image { avatarsUrl fallbackUrl __typename } fragment MovieHdVerticalPoster on Movie { gallery { posters { hdVertical: vertical(override: OTT_WHEN_EXISTS) { ...ShortImage __typename } __typename } __typename } __typename } fragment MovieKpVerticalPoster on Movie { gallery { posters { kpVertical: vertical { ...ShortImage __typename } __typename } __typename } __typename } fragment TicketOption on Movie { ticketOption { purchasable releaseAnnounce { available releaseDate { accuracy date __typename } __typename } __typename } __typename } fragment SuggestMovieItem on Movie { id contentId title { russian original __typename } rating { kinopoisk { isActive value __typename } __typename } ...MovieHdVerticalPoster ...MovieKpVerticalPoster viewOption { buttonText isAvailableOnline: isWatchable(filter: {anyDevice: false, anyRegion: false}) purchasabilityStatus contentPackageToBuy { billingFeatureName __typename } subscriptionBadge { image { avatarsUrl __typename } __typename } type availabilityAnnounce { groupPeriodType announcePromise availabilityDate type __typename } __typename } ...TicketOption userData @include(if: $withUserData) { isPlannedToWatch __typename } ... on Film { productionYear __typename } ... on TvSeries { releaseYears { end start __typename } __typename } ... on TvShow { releaseYears { end start __typename } __typename } ... on MiniSeries { releaseYears { end start __typename } __typename } __typename } fragment SuggestPersonItem on Person { id name originalName birthDate poster { avatarsUrl fallbackUrl __typename } __typename } fragment SuggestCinemaItem on Cinema { id ctitle: title city { id name geoId __typename } __typename } fragment SuggestMovieListItem on MovieListMeta { id cover { avatarsUrl __typename } coverBackground { avatarsUrl __typename } name url description movies(limit: 0) { total __typename } __typename }`;
     const KP_VOTE_MUT = `mutation MovieSetVote($movieId: Long!, $rate: Int!) {\n  movie {\n    vote {\n      set(input: {movieId: $movieId, rate: $rate}) {\n        error {\n          message\n          __typename\n        }\n        status\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n`;
     const KP_WATCH_MUT = `mutation MovieSetWatched($movieId: Long!) {\n  movie {\n    watched {\n      set(input: {movieId: $movieId}) {\n        error {\n          message\n          __typename\n        }\n        status\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n`;
     const KP_FAVORITE_MUT = `mutation SetMovieFavorite($movieId: Long!) {\n  movie {\n    favorite {\n      set(input: {movieId: $movieId}) {\n        status\n        error {\n          message\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n`;
+    const KP_FILM_DETAIL_QUERY = `query FilmDetail($id: Long!) {
+  movie {
+    film(id: $id) {
+      id
+      title { russian original alternative { name } }
+      duration
+      premiereWorld { date }
+      genres { name }
+      productionYear
+      ... on Film { productionYear }
+      ... on TvSeries { releaseYears { start end } }
+      ... on MiniSeries { releaseYears { start end } }
+      ... on TvShow { releaseYears { start end } }
+      persons(limit: 20) {
+        name { russian original }
+        professionText
+      }
+    }
+  }
+}`;
 
     async function kpGql(query, variables, op) {
         const url = op ? `${KP_GQL}?operationName=${encodeURIComponent(op)}` : KP_GQL;
@@ -670,50 +1408,57 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         for (let i = 1; i <= RETRY.GQL; i++) {
             try {
                 const bodyStr = JSON.stringify({ operationName: op, variables, query });
-                const r = await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', url, true);
-                    xhr.withCredentials = true;
-                    xhr.setRequestHeader('content-type', 'application/json');
-                    xhr.setRequestHeader('Accept', '*/*');
-                    xhr.setRequestHeader('Accept-Language', 'ru,en;q=0.9');
-                    xhr.setRequestHeader('x-kp-testids', '414549,436857,436979,1615440');
-                    xhr.setRequestHeader('x-search-request-id', genSearchId());
-                    xhr.setRequestHeader('service-id', '25');
-                    xhr.setRequestHeader('source-id', '1');
-                    xhr.setRequestHeader('x-preferred-language', 'ru');
-                    xhr.setRequestHeader('x-request-id', genId());
-                    xhr.setRequestHeader('traceparent', genTraceId());
-                    xhr.timeout = 10000;
-                    xhr.onload = () => resolve(xhr);
-                    xhr.onerror = () => reject(new Error('XHR failed'));
-                    xhr.ontimeout = () => reject(new Error('XHR timeout'));
-                    xhr.send(bodyStr);
+                // Use GM.xmlHttpRequest (via fetchT) instead of raw XHR — unified fetch pattern
+                // GM.xmlHttpRequest sends cookies for @connect domains by default
+                const r = await fetchT(url, 10000, {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        'Accept': '*/*',
+                        'Accept-Language': 'ru,en;q=0.9',
+                        'x-kp-testids': '414549,436857,436979,1615440',
+                        'x-search-request-id': genSearchId(),
+                        'service-id': '25',
+                        'source-id': '1',
+                        'x-preferred-language': 'ru',
+                        'x-request-id': genId(),
+                        'traceparent': genTraceId(),
+                    },
+                    body: bodyStr,
                 });
+                if (!r) {
+                    adjDelay(kpGqlDelay, 'error');
+                    if (i < RETRY.GQL) await sleep(kpGqlDelay.val * 1.6);
+                    continue;
+                }
                 const status = r.status;
-                const text = r.responseText || '';
-                if (status === 429) { adjDelay(gqlDelay, '429'); await sleep(gqlDelay.val * 1.5); continue; }
-                if (!text) { adjDelay(gqlDelay, 'error'); continue; }
+                const text = await r.text();
+                if (status === 429) {
+                    const ra = parseRetryAfter(r.responseHeaders);
+                    if (ra) { await sleep(ra); }
+                    else { adjDelay(kpGqlDelay, '429'); await sleep(kpGqlDelay.val * 1.5); }
+                    continue; }
+                if (!text) { adjDelay(kpGqlDelay, 'error'); continue; }
                 let json;
-                try { json = JSON.parse(text); } catch { 
+                try { json = JSON.parse(text); } catch {
                     console.warn(`[mrs] KP GQL non-JSON response (${status}):`, text.slice(0, 300));
-                    adjDelay(gqlDelay, 'error');
+                    adjDelay(kpGqlDelay, 'error');
                     continue;
                 }
                 if (json?.errors && !json?.data) {
                     console.warn(`[mrs] KP GQL errors (${status}):`, JSON.stringify(json.errors).slice(0, 500));
-                    adjDelay(gqlDelay, 'error');
+                    adjDelay(kpGqlDelay, 'error');
                     if (status >= 400 && status < 500) throw new Error(`GQL ${status}`);
                     continue;
                 }
-                adjDelay(gqlDelay, 'ok', 200);
+                adjDelay(kpGqlDelay, 'ok', 200);
                 return json;
             } catch (e) {
                 console.warn(`[mrs] KP GQL exception (attempt ${i}/${RETRY.GQL}):`, e.message);
-                adjDelay(gqlDelay, 'error');
+                adjDelay(kpGqlDelay, 'error');
                 if (i === RETRY.GQL) throw e;
             }
-            if (i < RETRY.GQL) await sleep(gqlDelay.val * 1.6);
+            if (i < RETRY.GQL) await sleep(kpGqlDelay.val * 1.6);
         }
         return null;
     }
@@ -729,111 +1474,159 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         return (!year || yearsMatch(mYear, year)) ? movie : null;
     }
 
-    async function searchKPId(title, year) {
-        const cacheKey = `kp:${normTitle(title)}|${year || ''}`;
+    async function searchKPId(title, year, deep = false, allTitles = []) {
+        const cacheKey = `kp:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}`;
         return dedupeFetch(cacheKey, async () => {
             const nKey = normTitle(title);
-            const vars = { keyword: title, yandexCityId: 6, limit: 20, withUserData: true };
+            const variants = deep ? getTitleVariants(title, allTitles) : getTitleVariants(title, allTitles).slice(0, 5);
+            let best = null;
 
-            for (let pass = 0; pass < 2; pass++) {
-                const json = await kpGql(KP_SUGGEST_QUERY, vars, 'SuggestSearch');
-                if (json?.errors) console.warn('[mrs] KP search errors:', JSON.stringify(json.errors).slice(0, 500));
-                const top = json?.data?.suggest?.top;
-                if (!top) continue;
+            // --- Phase 1: GQL Suggest ---
+            for (const q of variants.slice(0, deep ? variants.length : 3)) {
+                const vars = { keyword: q, yandexCityId: 6, limit: 20, withUserData: true };
+                for (let pass = 0; pass < 2; pass++) {
+                    const json = await kpGql(KP_SUGGEST_QUERY, vars, 'SuggestSearch');
+                    if (json?.errors) console.warn('[mrs] KP search errors:', JSON.stringify(json.errors).slice(0, 500));
+                    const top = json?.data?.suggest?.top;
+                    if (!top) continue;
 
-                const candidates = [];
-                const tr = top.topResult?.global;
-                if (tr && !tr.__typename?.includes('Person')) candidates.push(tr);
-                for (const e of top.movies ?? []) candidates.push(e?.movie);
+                    const candidates = [];
+                    const tr = top.topResult?.global;
+                    if (tr && !tr.__typename?.includes('Person')) candidates.push(tr);
+                    for (const e of top.movies ?? []) candidates.push(e?.movie);
 
-                for (const m of candidates) {
-                    const hit = pass === 0 ? matchMovie(m, nKey, year) : (m?.id ? m : null);
-                    if (!hit) continue;
-                    if (pass === 1) {
-                        const nR = normTitle(m.title?.russian ?? ''), nO = normTitle(m.title?.original ?? '');
-                        const nT = hasCyr(m.title?.russian ?? '') ? normTitle(translit(m.title.russian)) : '';
-                        if (![nR, nO, nT].includes(nKey)) continue;
+                    for (const m of candidates) {
+                        if (!m?.id) continue;
+                        const hit = pass === 0 ? matchMovie(m, nKey, year) : m;
+                        if (!hit) continue;
+                        const cand = {
+                            kpId: String(hit.id),
+                            titleRu: hit.title?.russian || '',
+                            titleOrig: hit.title?.original || '',
+                            year: String(hit.productionYear ?? hit.releaseYears?.start ?? hit.releaseYears?.end ?? ''),
+                            type: hit.__typename || 'Film',
+                        };
+                        const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
+                        const conf = confidenceLabel(score);
+                        if (conf === 'high') {
+                            DEBUG && console.log(`[mrs] KP search HIGH confidence: "${title}" (${year}) → kpId=${cand.kpId} score=${score.toFixed(2)}`);
+                            if (!year || !cand.year || yearsMatch(cand.year, year)) {
+                                return { ...cand, score, confidence: conf };
+                            }
+                        }
+                        if (!best || score > best.score) best = { ...cand, score, confidence: conf };
                     }
-                    console.log(`[mrs] KP search OK: "${title}" (${year}) → kpId=${hit.id}`);
-                    return { kpId: String(hit.id), existingRating: null };
                 }
             }
-            console.warn(`[mrs] KP search FAILED: "${title}" (${year}) — кандидаты не найдены`);
 
-            // HTML fallback (regex-based, no DOMParser)
-            try {
-                const r = await fetchT(`https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`);
-                if (r?.ok) {
-                    const html = await r.text();
-                    for (const match of html.matchAll(/<a[^>]+href="\/(?:film|series)\/(\d+)"[^>]*>([^<]+)</g)) {
-                        const [, id, text] = match;
-                        if (normTitle(text.trim()).includes(nKey)) return { kpId: id, existingRating: null };
-                    }
+            // --- Phase 2: HTML fallback ---
+            // NOTE: /index.php?kp_query= endpoint may be deprecated by Yandex.
+            // If this stops working, GQL Suggest (Phase 1) is the primary search method.
+            if (deep || !best || best.confidence !== 'high') {
+                for (const q of variants) {
+                    try {
+                        const r = await fetchT(`https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(q)}`);
+                        if (!r?.ok) continue;
+                        const html = await r.text();
+                        const matches = [...html.matchAll(/<a[^>]+href="\/(?:film|series)\/(\d+)"[^>]*>([^<]+)</g)];
+                        const seen = new Set();
+                        for (const [, id, text] of matches) {
+                            if (seen.has(id)) continue;
+                            seen.add(id);
+                            const ctxIdx = html.indexOf(id);
+                            const ctxStart = Math.max(0, ctxIdx - 200);
+                            const ctx = html.substring(ctxStart, ctxStart + 400);
+                            const yr = ctx.match(/\b(19|20)\d{2}\b/);
+                            const ruTitle = text.trim();
+                            let origTitle = '';
+                            const origSpan = ctx.match(/<span[^>]+class="[^"]*\b(?:original?|orig|en|subtitle)[^"]*"[^>]*>([^<]+)</i);
+                            if (origSpan) {
+                                origTitle = origSpan[1].trim();
+                            } else {
+                                const textFrags = ctx.split(/<[^>]+>/).map(s => s.trim()).filter(Boolean);
+                                for (const frag of textFrags) {
+                                    const clean = frag.replace(/[,;•–—]+/g, ' ').trim();
+                                    if (clean && clean !== ruTitle && clean.length > 2 && !/[а-яА-ЯёЁ]/.test(clean)) {
+                                        origTitle = clean;
+                                        break;
+                                    }
+                                }
+                            }
+                            const cand = {
+                                kpId: id,
+                                titleRu: ruTitle,
+                                titleOrig: origTitle,
+                                year: yr ? yr[0] : '',
+                                type: '',
+                            };
+                            const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
+                            const conf = confidenceLabel(score);
+                            if (conf === 'high') {
+                                DEBUG && console.log(`[mrs] KP HTML HIGH confidence: "${title}" (${year}) → kpId=${id} score=${score.toFixed(2)}`);
+                                if (!year || !cand.year || yearsMatch(cand.year, year)) {
+                                    return { ...cand, score, confidence: conf };
+                                }
+                            }
+                            if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                        }
+                    } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
                 }
-            } catch { }
+            }
+
+            if (best) {
+                DEBUG && console.log(`[mrs] KP search best: "${title}" (${year}) → kpId=${best.kpId} score=${best.score.toFixed(2)} conf=${best.confidence}`);
+                const yearOk = !best.year || !year || yearsMatch(best.year, year);
+                if (deep && best.confidence !== 'low' && yearOk) return best;
+                if (!deep && yearOk && (best.confidence === 'high' || best.confidence === 'medium' || (best.confidence === 'low' && best.score >= 350))) return best;
+            }
+
+            // Try matching the parent series for episode titles
+            const parent = extractSeriesParent(title);
+            if (parent && parent !== title) {
+                DEBUG && console.log(`[mrs] KP trying series parent: "${parent}" for "${title}"`);
+                return searchKPId(parent, year, deep);
+            }
+
+            console.warn(`[mrs] KP search FAILED: "${title}" (${year})`);
             return null;
         });
     }
 
     async function applyKP(kpId, rating, favorite) {
         const hasR = rating != null && String(rating) !== '' && +rating >= 1 && +rating <= 10;
-        let status = null;
-
-        if (hasR) {
-            const json = await kpGql(KP_VOTE_MUT, { movieId: +kpId, rate: +rating }, 'MovieSetVote');
-            if (!json) {
-                console.warn(`[mrs] KP vote FAILED (null response): kpId=${kpId} rating=${rating}`);
-            } else {
-                if (json.errors) console.warn(`[mrs] KP vote GQL errors: kpId=${kpId}`, JSON.stringify(json.errors).slice(0, 500));
-                const r = json?.data?.movie?.vote?.set;
-                if (r && !r.error) {
-                    status = 'rated';
-                    console.log(`[mrs] KP apply OK: kpId=${kpId} rating=${rating} \u2192 rated`);
-                } else {
-                    console.warn(`[mrs] KP vote FAILED: kpId=${kpId} rating=${rating}`, r?.error?.message || 'no result');
-                }
-            }
-        } else {
-            const json = await kpGql(KP_WATCH_MUT, { movieId: +kpId }, 'MovieSetWatched');
-            if (!json) {
-                console.warn(`[mrs] KP watched FAILED (null response): kpId=${kpId}`);
-            } else {
-                if (json.errors) console.warn(`[mrs] KP watched GQL errors: kpId=${kpId}`, JSON.stringify(json.errors).slice(0, 500));
-                const r = json?.data?.movie?.watched?.set;
-                if (r && !r.error) {
-                    status = t('watched');
-                    console.log(`[mrs] KP apply OK: kpId=${kpId} \u2192 watched`);
-                } else {
-                    console.warn(`[mrs] KP watched FAILED: kpId=${kpId}`, r?.error?.message || 'no result');
-                }
-            }
+        const op = hasR ? 'MovieSetVote' : 'MovieSetWatched';
+        const vars = hasR ? { movieId: +kpId, rate: +rating } : { movieId: +kpId };
+        const json = await kpGql(hasR ? KP_VOTE_MUT : KP_WATCH_MUT, vars, op);
+        if (!json) {
+            console.warn(`[mrs] KP apply FAILED (null response): kpId=${kpId} rating=${rating}`);
+            return null;
         }
-
+        if (json.errors) {
+            console.warn(`[mrs] KP apply ERRORS: kpId=${kpId} rating=${rating}`, JSON.stringify(json.errors).slice(0, 500));
+        }
+        const r = hasR ? json?.data?.movie?.vote?.set : json?.data?.movie?.watched?.set;
+        if (r?.error) {
+            console.warn(`[mrs] KP apply GQL ERROR: kpId=${kpId} rating=${rating} msg=${r.error.message}`, JSON.stringify(r).slice(0, 300));
+        }
+        const ok = r && !r.error;
+        if (ok) DEBUG && console.log(`[mrs] KP apply OK: kpId=${kpId} rating=${rating} → ${hasR ? 'rated' : 'watched'}`);
+        if (!ok) return null;
+        const baseStatus = hasR ? 'rated' : 'watched';
         if (favorite) {
             try {
                 const favJson = await kpGql(KP_FAVORITE_MUT, { movieId: +kpId }, 'SetMovieFavorite');
-                if (!favJson) {
-                    console.warn(`[mrs] KP favorite FAILED (null response): kpId=${kpId}`);
-                } else {
-                    if (favJson.errors) console.warn(`[mrs] KP favorite GQL errors: kpId=${kpId}`, JSON.stringify(favJson.errors).slice(0, 500));
-                    const r = favJson?.data?.movie?.favorite?.set;
-                    if (r && !r.error) {
-                        console.log(`[mrs] KP favorite OK: kpId=${kpId}`);
-                        if (!status) status = 'favorited';
-                    } else {
-                        console.warn(`[mrs] KP favorite FAILED: kpId=${kpId}`, r?.error?.message || 'no result');
-                    }
-                }
+                const favOk = favJson?.data?.movie?.favorite?.set && !favJson?.data?.movie?.favorite?.set?.error;
+                if (favOk) DEBUG && console.log(`[mrs] KP favorite OK: kpId=${kpId}`);
+                else console.warn(`[mrs] KP favorite MAY FAIL: kpId=${kpId}`, favJson);
             } catch (e) {
                 console.warn(`[mrs] KP favorite error: kpId=${kpId}`, e.message);
             }
         }
-
-        return status;
+        return baseStatus;
     }
 
     async function kpFetchRatings(statusEl) {
-        const uid = getKPUserId();
+        const uid = await resolveKPUserId(statusEl);
         if (!uid) {
             setStatus(statusEl, t('userIdWarn'));
             return new Map();
@@ -841,81 +1634,150 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         const baseUrl = `https://www.kinopoisk.ru/user/${uid}/movies/voted-watched`;
         const map = new Map();
         let totalPages = 0;
-        for (let p = 1; p <= 2000; p++) {
-            setStatus(statusEl, t('loadingExisting', {p: p, total: (totalPages ? '/' + totalPages : ''), count: map.size}));
-            const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
-            if (!doc) break;
-            if (p === 1 && !totalPages) {
-                for (const a of doc.querySelectorAll('a[href*="?page="], a[href*="&page="]')) {
-                    const m = a.href.match(/[?&]page=(\d+)/);
-                    if (m) totalPages = Math.max(totalPages, +m[1]);
+        // Fetch page 1 first to discover totalPages
+        setStatus(statusEl, t('loadingExisting', { p: 1, total: '', count: 0 }) + dots());
+        {
+            const { doc } = await fetchDocTimed(`${baseUrl}/?page=1`);
+            if (doc) {
+                if (!totalPages) {
+                    for (const a of doc.querySelectorAll('a[href*="?page="], a[href*="&page="]')) {
+                        const m = a.href.match(/[?&]page=(\d+)/);
+                        if (m) totalPages = Math.max(totalPages, +m[1]);
+                    }
+                }
+                const items = parseKPListingPage(doc);
+                for (const item of items) {
+                    if (!item.kpId || map.has(item.kpId)) continue;
+                    map.set(item.kpId, item.rating != null ? item.rating : 'watched');
                 }
             }
-            const items = parseKPListingPage(doc);
-            if (!items.length) break;
-            for (const item of items) {
-                if (!item.kpId || map.has(item.kpId)) continue;
-                map.set(item.kpId, item.rating != null ? item.rating : t('watched'));
+        }
+
+        // Fetch remaining pages in parallel
+        if (totalPages > 1) {
+            const pageNums = [];
+            for (let p = 2; p <= totalPages; p++) pageNums.push(p);
+            const results = await asyncPool(10, pageNums, async (p) => {
+                const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
+                if (!doc) return [];
+                return parseKPListingPage(doc);
+            });
+            for (const r of results) {
+                if (r.status === 'fulfilled' && r.value) {
+                    for (const item of r.value) {
+                        if (!item.kpId || map.has(item.kpId)) continue;
+                        map.set(item.kpId, item.rating != null ? item.rating : 'watched');
+                    }
+                }
             }
-            if (totalPages && p >= totalPages) break;
-            await sleep(DELAY.PAGE_BETWEEN);
+            setStatus(statusEl, t('loadingExisting', { p: totalPages, total: '/' + totalPages, count: map.size }));
         }
         return map;
     }
 
-    async function runKPImportBatch(items, statusEl, mode) {
-        Object.assign(kpGqlProbe, makeProbe(20, PLATFORM_MAX.kpGql));
-        gqlDelay.val = DELAY.GQL_INIT;
-        setStatus(statusEl, t('loadedRecords', {count: items.length, next: (mode === 'normal' ? t('checkingExisting') : t('startingImport'))}));
-        const existing = mode === 'normal' ? await kpFetchRatings(statusEl) : new Map();
-        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0;
+    async function runKPImportBatch(items, statusEl, mode, deep = false, opts = {}) {
+        Object.assign(kpGqlProbe, makeProbe(30, PLATFORM_MAX.kpGql));
+        kpGqlDelay.val = DELAY.GQL_INIT;
+        setStatus(statusEl, t('loadedRecords', { count: items.length, next: mode === 'normal' ? t('checkingExisting') : t('startingImport') }) + dots());
+        const existing = mode === 'normal' && !deep ? await kpFetchRatings(statusEl) : new Map();
+        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0, favCount = 0;
         const missed = [];
+        const skippedFavIds = [];
         let cur = 0;
 
         while (cur < items.length) {
             const slice = items.slice(cur, cur + kpGqlProbe.c);
-            setStatus(statusEl, t('importProgress', {platform: 'Kinopoisk', from: cur + 1, to: Math.min(cur + kpGqlProbe.c, items.length), total: items.length}));
+            setStatus(statusEl, t('importProgress', { platform: 'Kinopoisk', from: cur + 1, to: Math.min(cur + kpGqlProbe.c, items.length), total: items.length }) + dots());
             const res = await asyncPool(kpGqlProbe.c, slice, async item => {
-                const kpId = (item.kpId && /^\d+$/.test(item.kpId)) ? item.kpId : (await searchKPId(item.title, item.year))?.kpId;
-                if (!kpId) return 'notfound';
-                const ex = existing.get(kpId);
+                const kpResult = (item.kpId && /^\d+$/.test(item.kpId))
+                    ? { kpId: item.kpId, score: 1.0, confidence: 'high' }
+                    : await searchKPId(item.title, item.year, deep, item.allTitles);
+                if (!kpResult || kpResult.confidence === 'low') return 'notfound';
+
+                const ex = existing.get(kpResult.kpId);
                 const hasR = item.rating != null && +item.rating >= 1 && +item.rating <= 10;
-                if (mode === 'normal' && ex != null && (ex !== t('watched') || !hasR)) return 'skipped';
-                return await applyKP(kpId, item.rating, item.favorite) ?? 'failed';
+                if (mode === 'normal' && ex != null && (ex !== 'watched' || !hasR)) {
+                    if (opts.importFavorites && item.favorite) skippedFavIds.push(kpResult.kpId);
+                    return 'skipped';
+                }
+                const appResult = await applyKP(kpResult.kpId, item.rating, opts.importFavorites && item.favorite);
+                if (appResult && opts.importFavorites && item.favorite) return 'rated+fav';
+                return appResult ?? 'failed';
             });
             const t0 = Date.now();
             let fail = false;
             res.forEach((r, j) => {
                 const s = r.status === 'fulfilled' ? r.value : 'failed';
-                if (s === 'rated') rated++;
-                else if (s === t('watched')) watched++;
+                if (s === 'rated' || s === 'rated+fav') {
+                    rated++;
+                    if (s === 'rated+fav') favCount++;
+                }
+                else if (s === 'watched') watched++;
                 else if (s === 'skipped') skipped++;
-                else if (s === 'notfound') { notFound++; missed.push(slice[j]); }
-                else { failed++; missed.push(slice[j]); fail = true; }
+                else if (s === 'notfound') { notFound++; missed.push({ ...slice[j], error: t('errorNotFoundKP') }); }
+                else { failed++; missed.push({ ...slice[j], error: t('errorApi') }); fail = true; }
             });
             cur += kpGqlProbe.c;
             const elapsed = Date.now() - t0;
             fail ? probeFail(kpGqlProbe) : probeOk(kpGqlProbe, elapsed);
-            if (cur < items.length) await sleep(gqlDelay.val);
+            // No artificial sleep between batches
         }
-        return { rated, watched, skipped, notFound, failed, missed };
+        // Apply favorites for skipped items
+        if (opts.importFavorites && skippedFavIds.length) {
+            setStatus(statusEl, 'Applying favorites for skipped films...' + dots());
+            for (const kpId of skippedFavIds) {
+                try {
+                    const favJson = await kpGql(KP_FAVORITE_MUT, { movieId: +kpId }, 'SetMovieFavorite');
+                    if (favJson?.data?.movie?.favorite?.set && !favJson?.data?.movie?.favorite?.set?.error) {
+                        favCount++;
+                        if (favCount <= 5 || favCount % 20 === 0) DEBUG && console.log(`[mrs] KP favorite OK (skipped): kpId=${kpId}`);
+                    }
+                } catch (e) {
+                    console.warn(`[mrs] KP favorite error (skipped): kpId=${kpId}`, e.message);
+                }
+                await sleep(200);
+            }
+        }
+        return { rated, watched, skipped, notFound, failed, missed, favorites: favCount };
     }
 
-    async function performKPImport(csvData, statusEl, mode) {
-        const items = parseCSV(csvData);
-        if (!items.length) return setStatus(statusEl, t('csvEmpty'));
-        const t0 = Date.now();
-        const result = await runKPImportBatch(items, statusEl, mode);
-        const elapsed = Math.round((Date.now() - t0) / 1000);
-        const lbl = mode === 'replace' ? ' (режим замены)' : '';
-        if (result.missed.length) downloadCSV(buildCSV(result.missed), 'kp_missed.csv');
-        renderResult(statusEl, `✅ Готово${lbl} (${elapsed} сек)!`, [
+    function renderKPResult(result, statusEl, mode) {
+        const lbl = mode === 'replace' ? t('replaceMode') : '';
+        const kpPairs = [
             [t('rated'), result.rated],
             [t('watchedShort'), result.watched],
             [t('skipped'), result.skipped],
             [t('notFound'), result.notFound],
             [t('failed'), result.failed],
-        ], result.notFound === 0 && result.failed === 0 ? t('allImported') : null);
+        ];
+        if (result.favorites != null) kpPairs.push([t('favorites'), result.favorites]);
+        renderResult(statusEl, t('done', { mode: lbl }), kpPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
+        if (result.missed.length) {
+            downloadCSV(buildCSV(result.missed), 'kp_missed.csv');
+            const btn = Object.assign(document.createElement('button'), {
+                id: 'mrs-retry-kp',
+                className: 'mrs-btn mrs-btn--secondary',
+                textContent: t('deepSearchBtn', { count: result.missed.length }),
+            });
+            btn.addEventListener('click', async () => {
+                setStatus(statusEl, t('deepSearch', { platform: 'Kinopoisk' }) + dots());
+                const r2 = await runKPImportBatch(result.missed, statusEl, mode, true, getImportOptions());
+                renderKPResult(r2, statusEl, mode);
+            });
+            const btnWrap = document.createElement('div');
+            btnWrap.style.padding = '0 18px 14px';
+            btnWrap.appendChild(btn);
+            statusEl.appendChild(btnWrap);
+        }
+    }
+
+    async function performKPImport(csvData, statusEl, mode, deep = false, opts = {}) {
+        const items = parseCSV(csvData);
+        if (!items.length) return setStatus(statusEl, t('csvEmpty'));
+        const t0 = Date.now();
+        const result = await runKPImportBatch(items, statusEl, mode, false, opts);
+        result.elapsedMs = Date.now() - t0;
+        renderKPResult(result, statusEl, mode);
     }
 
     // ====================== IMDb MODULE ======================
@@ -960,7 +1822,7 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             const d = JSON.parse(document.getElementById('__NEXT_DATA__')?.textContent ?? 'null');
             const uid = d?.props?.pageProps?.requestContext?.sidecar?.account?.userId;
             if (uid) return uid;
-        } catch { }
+        } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
         return location.href.match(/\/user\/(ur\d+)/i)?.[1] ?? null;
     }
 
@@ -983,20 +1845,20 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             if (!edges.length) break;
             parseEdges(edges, set);
             if (!search?.pageInfo?.hasNextPage) break;
-            await sleep(DELAY.HISTORY_PAGE);
+            await sleep(Math.max(15, DELAY.HISTORY_PAGE - 20));
         }
     }
 
     async function getIMDbHistory(statusEl) {
         if (imdbHistory) return imdbHistory;
-        setStatus(statusEl, t('profileDetect', {platform: 'IMDb'}));
+        setStatus(statusEl, t('profileDetect', { platform: 'IMDb' }) + dots());
         const uid = getIMDbUid();
         if (!uid) {
             setStatus(statusEl, t('imdbUserIdNotFound'));
             return imdbHistory = { rated: new Set(), watched: new Set() };
         }
         const rated = new Set(), watched = new Set();
-        await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t(t('ratings')), statusEl, rated);
+        await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings'), statusEl, rated);
         await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory'), statusEl, watched);
         return imdbHistory = { rated, watched };
     }
@@ -1004,6 +1866,23 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
     const IMDB_GQL = 'https://api.graphql.imdb.com/';
     const GQL_RATE = `mutation RateTitle($titleId:ID!,$rating:Int!){rateTitle(input:{titleId:$titleId,rating:$rating}){rating{value}}}`;
     const GQL_WATCH = `mutation AddWatched($titleId:ID!){addWatchedTitle(titleId:$titleId){success}}`;
+    const GQL_CREATE_LIST = `mutation CreateList($input: CreateListInput!){createList(input:$input){listId __typename}}`;
+    const GQL_ADD_TO_LIST = `mutation AddItemToList($input: AddItemToListInput!){addItemToList(input:$input){listId __typename}}`;
+    const IMDB_TITLE_QUERY = `query GetTitleMetadata($tConst: ID!) {
+  title(id: $tConst) {
+    titleText { text }
+    originalTitleText { text }
+    releaseYear { year }
+    runtime { seconds }
+    genres { genres { text } }
+    userRating { value }
+    principalCredits {
+      category { id text }
+      credits { name { nameText { text } } }
+    }
+    akas(first: 10) { edges { node { text } } }
+  }
+}`;
 
     async function imdbGql(query, variables) {
         for (let i = 1; i <= RETRY.GQL; i++) {
@@ -1012,146 +1891,694 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query, variables }),
                 });
-                if (!r) { adjDelay(gqlDelay, 'error'); continue; }
-                if (r.status === 429) { adjDelay(gqlDelay, '429'); await sleep(gqlDelay.val * 1.5); continue; }
+                if (!r) { adjDelay(imdbGqlDelay, 'error'); continue; }
+                if (r.status === 429) {
+                    const ra = parseRetryAfter(r.responseHeaders);
+                    if (ra) { await sleep(ra); }
+                    else { adjDelay(imdbGqlDelay, '429'); await sleep(imdbGqlDelay.val * 1.5); }
+                    continue; }
                 const json = await r.json().catch(() => ({}));
-                adjDelay(gqlDelay, json?.errors ? '429' : 'ok', 200);
+                adjDelay(imdbGqlDelay, json?.errors ? '429' : 'ok', 200);
                 return json;
-            } catch { adjDelay(gqlDelay, 'error'); }
-            if (i < RETRY.GQL) await sleep(gqlDelay.val * 1.6);
+            } catch { adjDelay(imdbGqlDelay, 'error'); }
+            if (i < RETRY.GQL) await sleep(imdbGqlDelay.val * 1.6);
         }
         return null;
     }
 
-    async function applyIMDb(ttId, rating, rated, watched) {
-        const hasR = rating != null && String(rating) !== '' && +rating >= 1 && +rating <= 10;
-        if (hasR) {
-            const j = await imdbGql(GQL_RATE, { titleId: ttId, rating: +rating });
-            if (j?.data?.rateTitle?.rating?.value) { rated.add(ttId); watched.add(ttId); return 'rated'; }
-        } else {
-            const j = await imdbGql(GQL_WATCH, { titleId: ttId });
-            if (j?.data?.addWatchedTitle?.success) { watched.add(ttId); return t('watched'); }
-        }
-        return null;
-    }
-
-    async function searchIMDbFallback(title, year) {
-        const cacheKey = `imdb:${normTitle(title)}|${year || ''}`;
-        return dedupeFetch(cacheKey, async () => {
-            const qs = [title, ...(hasCyr(title) ? [translit(title)] : [])];
-            for (const q of qs) {
-                for (const ttype of ['ft', 'tv']) {
-                    const r = await fetchT(`https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt&ttype=${ttype}`);
-                    if (!r?.ok) continue;
+    let __imdbFavouritesListId = null;
+    async function getIMDbFavouritesList() {
+        if (__imdbFavouritesListId) return __imdbFavouritesListId;
+        const uid = getIMDbUid();
+        if (uid) {
+            try {
+                const r = await fetchT(`https://www.imdb.com/user/${uid}/lists`);
+                if (r?.ok) {
                     const html = await r.text();
-                    const ids = [...new Set([...html.matchAll(/\/title\/(tt\d+)/g)].map(m => m[1]))];
-                    if (!ids.length) continue;
-                    if (year) {
-                        for (const id of ids) {
-                            const idx = html.indexOf(id);
-                            if (html.substring(Math.max(0, idx - 200), idx + 200).includes(String(year))) return id;
+                    // Method 1: data-testid="list-name" (standard IMDb)
+                    const blocks = [...html.matchAll(/list\/(ls\d+)[^>]*>[\s\S]*?data-testid="list-name"[^>]*>([^<]+)</g)];
+                    for (const [, id, name] of blocks) {
+                        if (/favou?rites/i.test(name.trim())) {
+                            __imdbFavouritesListId = id;
+                            DEBUG && console.log(`[mrs] IMDb found Favorites list (data-testid): ${id}`);
+                            return id;
                         }
                     }
-                    return ids[0];
+                    // Method 2: fallback — find all list links and check surrounding text
+                    const listLinks = [...html.matchAll(/href=['"]\/list\/(ls\d+)(?:\/[^'"]*)?['"]/g)];
+                    for (const match of listLinks) {
+                        const id = match[1];
+                        const ctxStart = Math.max(0, match.index - 300);
+                        const ctx = html.substring(ctxStart, match.index + 300);
+                        if (/favou?rites/i.test(ctx)) {
+                            __imdbFavouritesListId = id;
+                            DEBUG && console.log(`[mrs] IMDb found Favorites list (context fallback): ${id}`);
+                            return id;
+                        }
+                    }
+                }
+            } catch (e) { console.warn('[mrs] IMDb list scrape error:', e.message); }
+        }
+        return null;
+    }
+    async function getOrCreateIMDbFavouritesList() {
+        if (__imdbFavouritesListId) return __imdbFavouritesListId;
+        // Check persistent cache first — once found/created, never search again
+        try {
+            const cached = GM_getValue('mrs_imdb_fav_list', null);
+            if (cached) {
+                __imdbFavouritesListId = cached;
+                return cached;
+            }
+        } catch (e) { /* ignore */ }
+        const lid = await dedupeFetch('imdbCreateFavList', async () => {
+            const existing = await getIMDbFavouritesList();
+            if (existing) {
+                try { GM_setValue('mrs_imdb_fav_list', existing); } catch (e) { /* ignore */ }
+                return existing;
+            }
+            const j = await imdbGql(GQL_CREATE_LIST, {
+                input: { name: 'Favorites', listDescription: 'My favorite movies', allowDuplicates: false, listType: 'TITLES', visibility: 'PRIVATE' }
+            });
+            const newLid = j?.data?.createList?.listId ?? null;
+            if (newLid) {
+                try { GM_setValue('mrs_imdb_fav_list', newLid); } catch (e) { /* ignore */ }
+            }
+            return newLid;
+        });
+        if (lid) __imdbFavouritesListId = lid;
+        return lid;
+    }
+
+    let __imdbFavCache = null;
+    async function getIMDbFavCache(listId) {
+        if (__imdbFavCache && __imdbFavCache.listId === listId) return __imdbFavCache;
+        __imdbFavCache = await dedupeFetch(`imdbFavCache:${listId}`, async () => {
+            const ids = new Set();
+            for (let page = 1; page <= 10; page++) {
+                const url = `https://www.imdb.com/list/${listId}/?page=${page}`;
+                const r = await fetchT(url);
+                if (!r?.ok) { DEBUG && console.log('[mrs] IMDb fav cache: HTTP error for', url); break; }
+                const html = await r.text();
+                // Method 1: data-const attributes (classic IMDb list items)
+                const dataConsts = [...html.matchAll(/data-const="(tt\d+)"/g)];
+                if (dataConsts.length > 0) {
+                    const before = ids.size;
+                    for (const m of dataConsts) ids.add(m[1]);
+                    if (ids.size === before) break;
+                } else {
+                    // Method 2: /title/tt\d+/ links (full page — false positive risk is low on list pages)
+                    const titleLinks = [...html.matchAll(/\/title\/(tt\d+)/g)];
+                    if (titleLinks.length === 0) break;
+                    const before = ids.size;
+                    for (const m of titleLinks) ids.add(m[1]);
+                    if (ids.size === before) break;
+                }
+                await sleep(250);
+            }
+            // Fallback: try GQL if HTML returned nothing
+            if (ids.size === 0) {
+                DEBUG && console.warn('[mrs] IMDb fav cache: HTML scraping found 0 items, trying GQL variants');
+                // Try multiple GQL query structures — IMDb's internal schema varies
+                const gqlVariants = [
+                    { q: `query GetListTitles($listId: ID!, $limit: Int!) { list(listId: $listId) { listItems(limit: $limit) { listItem { item { id } } } } }`, v: { listId, limit: 10000 }, fn: d => d?.list?.listItems?.map(it => it?.listItem?.item?.id) },
+                    { q: `query GetListTitles($listId: ID!, $first: Int!) { list(listId: $listId) { items(first: $first) { edges { node { ... on Title { id } } } } } }`, v: { listId, first: 10000 }, fn: d => d?.list?.items?.edges?.map(e => e?.node?.id) },
+                    { q: `query GetListTitles($listId: ID!, $first: Int!) { list(listId: $listId) { items(first: $first) { nodes { id } } } } }`, v: { listId, first: 10000 }, fn: d => d?.list?.items?.nodes?.map(n => n?.id) },
+                    { q: `query GetListTitles($listId: ID!, $limit: Int!) { list(listId: $listId) { items(limit: $limit) { item { id } } } } }`, v: { listId, limit: 10000 }, fn: d => d?.list?.items?.map(i => i?.item?.id) },
+                    { q: `query GetListTitles($listId: ID!) { titleList(listId: $listId) { items { item { id } } } } }`, v: { listId }, fn: d => d?.titleList?.items?.map(i => i?.item?.id) },
+                ];
+                for (const gv of gqlVariants) {
+                    const existing = await imdbGql(gv.q, gv.v);
+                    const gqlIds = (gv.fn(existing?.data) ?? []).filter(Boolean);
+                    if (gqlIds.length > 0) {
+                        for (const id of gqlIds) ids.add(id);
+                        DEBUG && console.log(`[mrs] IMDb fav cache: GQL variant found ${gqlIds.length} items`);
+                        break;
+                    }
+                }
+                if (ids.size === 0) {
+                    DEBUG && console.warn('[mrs] IMDb fav cache: all GQL variants returned 0 items — duplicates may occur');
                 }
             }
+            return { listId, ids };
+        });
+        return __imdbFavCache;
+    }
+
+    async function applyIMDb(ttId, rating, rated, watched, favorite) {
+        const hasR = rating != null && String(rating) !== '' && +rating >= 1 && +rating <= 10;
+        let status = null;
+        if (hasR) {
+            const j = await imdbGql(GQL_RATE, { titleId: ttId, rating: +rating });
+            if (j?.data?.rateTitle?.rating?.value) { rated.add(ttId); watched.add(ttId); status = 'rated'; }
+        } else {
+            const j = await imdbGql(GQL_WATCH, { titleId: ttId });
+            if (j?.data?.addWatchedTitle?.success) { watched.add(ttId); status = 'watched'; }
+        }
+        if (favorite && status) {
+            const listId = await getOrCreateIMDbFavouritesList();
+            if (listId) {
+                try {
+                    const cache = await getIMDbFavCache(listId);
+                    if (cache.ids.has(ttId)) {
+                        DEBUG && console.log(`[mrs] IMDb favorite skip (already in list): ${ttId}`);
+                    } else {
+                        const j = await imdbGql(GQL_ADD_TO_LIST, { input: { listId, item: { itemElementId: ttId } } });
+                        if (j?.data?.addItemToList?.listId) {
+                            cache.ids.add(ttId);
+                            DEBUG && console.log(`[mrs] IMDb favorite OK: ${ttId}`);
+                        }
+                    }
+                } catch (e) { console.warn(`[mrs] IMDb favorite error: ${ttId}`, e.message); }
+            }
+        }
+        return status;
+    }
+
+    // --- IndexedDB cache backend (async, non-blocking) ---
+    // Replaces GM_setValue for large cache data — avoids UI freezes
+    const _idb = (() => {
+        let _db = null;
+        const _ready = new Promise((resolve) => {
+            try {
+                const req = indexedDB.open('mrs_cache', 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('searchCache')) {
+                        db.createObjectStore('searchCache');
+                    }
+                    if (!db.objectStoreNames.contains('filmCache')) {
+                        db.createObjectStore('filmCache');
+                    }
+                };
+                req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+                req.onerror = () => { console.warn('[mrs] IndexedDB open failed, falling back to GM_setValue'); resolve(null); };
+            } catch (e) {
+                console.warn('[mrs] IndexedDB not available, falling back to GM_setValue:', e.message);
+                resolve(null);
+            }
+        });
+        // Write a single entry to an object store (async, non-blocking)
+        async function put(store, key, value) {
+            const db = await _ready;
+            if (!db) return;
+            try {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).put(value, key);
+                await new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+            } catch (e) { /* ignore — in-memory cache is primary */ }
+        }
+        // Bulk write all entries from a Map to an object store
+        async function putAll(store, map) {
+            const db = await _ready;
+            if (!db) throw new Error('IndexedDB unavailable'); // triggers flush() .catch() fallback
+            const tx = db.transaction(store, 'readwrite');
+            const os = tx.objectStore(store);
+            for (const [k, v] of map) os.put(v, k);
+            await new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+        }
+        // Read all entries from an object store into a Map
+        async function getAll(store) {
+            const db = await _ready;
+            if (!db) return null;
+            try {
+                const tx = db.transaction(store, 'readonly');
+                return await new Promise((resolve) => {
+                    const os = tx.objectStore(store);
+                    const result = new Map();
+                    const cursorReq = os.openCursor();
+                    cursorReq.onsuccess = (e) => {
+                        const cursor = e.target.result;
+                        if (cursor) { result.set(cursor.key, cursor.value); cursor.continue(); }
+                        else resolve(result);
+                    };
+                    cursorReq.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+        // Clear an object store
+        async function clear(store) {
+            const db = await _ready;
+            if (!db) return;
+            try {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).clear();
+                await new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+            } catch (e) { /* ignore */ }
+        }
+        // Delete a single entry
+        async function del(store, key) {
+            const db = await _ready;
+            if (!db) return;
+            try {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).delete(key);
+                await new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+            } catch (e) { /* ignore */ }
+        }
+        return { put, putAll, getAll, clear, del, ready: _ready };
+    })();
+
+    // --- Search result cache (in-memory Map + IndexedDB persist) ---
+    const _memCache = new Map();
+    const _memCacheTTL = 7 * 24 * 60 * 60 * 1000;
+    // Hydrate from IndexedDB (async, non-blocking) + migrate from GM_getValue if needed
+    (async () => {
+        // Try IndexedDB first
+        const idbData = await _idb.getAll('searchCache');
+        if (idbData && idbData.size > 0) {
+            const now = Date.now();
+            for (const [k, v] of idbData) {
+                if (v && v.value != null && now - v.ts <= _memCacheTTL) _memCache.set(k, v);
+            }
+            return;
+        }
+        // Migration: read old GM_getValue data and migrate to IndexedDB
+        try {
+            const raw = GM_getValue('mrs_search_cache', null);
+            if (raw) {
+                const disk = JSON.parse(raw);
+                const now = Date.now();
+                const toMigrate = new Map();
+                for (const [k, v] of Object.entries(disk)) {
+                    if (v && v.value != null && now - v.ts <= _memCacheTTL) {
+                        _memCache.set(k, v);
+                        toMigrate.set(k, v);
+                    }
+                }
+                if (toMigrate.size > 0) await _idb.putAll('searchCache', toMigrate);
+                // Clear old GM storage after successful migration
+                try { GM_deleteValue('mrs_search_cache'); } catch (e) { /* ignore */ }
+            }
+        } catch (e) { console.warn("[mrs] searchCache migration error:", e?.message ?? e); }
+    })();
+    const searchCache = {
+        get(key) {
+            const entry = _memCache.get(key);
+            if (entry === undefined) return undefined;
+            if (Date.now() - entry.ts > _memCacheTTL) { _memCache.delete(key); return undefined; }
+            return entry.value;
+        },
+        set(key, value) {
+            _memCache.set(key, { ts: Date.now(), value });
+            if (_memCache.size > 3000) {
+                const entries = [..._memCache.entries()];
+                entries.sort((a, b) => a[1].ts - b[1].ts);
+                for (let i = 0; i < entries.length - 2500; i++) _memCache.delete(entries[i][0]);
+            }
+        },
+        flush() {
+            // Async write to IndexedDB — no JSON.stringify, no UI freeze
+            _idb.putAll('searchCache', _memCache).catch(() => {
+                // Fallback to GM_setValue if IndexedDB failed
+                try { GM_setValue('mrs_search_cache', JSON.stringify(Object.fromEntries(_memCache))); } catch (e) { /* ignore */ }
+            });
+        }
+    };
+    // --- Persistent film detail cache (in-memory Map + IndexedDB persist) ---
+    const _filmCache = new Map();
+    const _filmCacheTTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+    // Hydrate from IndexedDB (async, non-blocking) + migrate from GM_getValue if needed
+    (async () => {
+        const idbData = await _idb.getAll('filmCache');
+        if (idbData && idbData.size > 0) {
+            const now = Date.now();
+            for (const [k, v] of idbData) {
+                if (v && v.value != null && now - v.ts <= _filmCacheTTL) _filmCache.set(k, v);
+            }
+            return;
+        }
+        // Migration from old GM_getValue storage
+        try {
+            const raw = GM_getValue('mrs_film_cache', null);
+            if (raw) {
+                const disk = JSON.parse(raw);
+                const now = Date.now();
+                const toMigrate = new Map();
+                for (const [k, v] of Object.entries(disk)) {
+                    if (v && v.value != null && now - v.ts <= _filmCacheTTL) {
+                        _filmCache.set(k, v);
+                        toMigrate.set(k, v);
+                    }
+                }
+                if (toMigrate.size > 0) await _idb.putAll('filmCache', toMigrate);
+                try { GM_deleteValue('mrs_film_cache'); } catch (e) { /* ignore */ }
+            }
+        } catch (e) { /* ignore */ }
+    })();
+    const filmDetailCache = {
+        get(key) {
+            const entry = _filmCache.get(key);
+            if (entry === undefined) return undefined;
+            if (Date.now() - entry.ts > _filmCacheTTL) { _filmCache.delete(key); return undefined; }
+            return entry.value;
+        },
+        set(key, value) {
+            _filmCache.set(key, { ts: Date.now(), value });
+            if (_filmCache.size > 5000) {
+                const entries = [..._filmCache.entries()];
+                entries.sort((a, b) => a[1].ts - b[1].ts);
+                for (let i = 0; i < entries.length - 4000; i++) _filmCache.delete(entries[i][0]);
+            }
+        },
+        flush() {
+            // Async write to IndexedDB — no JSON.stringify, no UI freeze
+            _idb.putAll('filmCache', _filmCache).catch(() => {
+                // Fallback to GM_setValue if IndexedDB failed
+                try { GM_setValue('mrs_film_cache', JSON.stringify(Object.fromEntries(_filmCache))); } catch (e) { /* ignore */ }
+            });
+        }
+    };
+    async function searchIMDbSuggest(title) {
+        const cacheKey = `imdbSuggest:${normTitle(title)}`;
+        return dedupeFetch(cacheKey, async () => {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const rawFirst = (title[0] || 'a').toLowerCase();
+                    const firstLetter = encodeURIComponent(CYR[rawFirst.toUpperCase()] ? (CYR[rawFirst.toUpperCase()] || rawFirst).toLowerCase() : rawFirst);
+                    const r = await fetchT(`https://sg.media-imdb.com/suggests/${firstLetter}/${encodeURIComponent(title)}.json`, 5000);
+                    if (!r) { await sleep(300 + attempt * 400); continue; }
+                    if (r.status === 429) { await sleep(300 + attempt * 400); continue; }
+                    if (!r.ok) {
+                        if (r.status === 404) return [];
+                        if (attempt < 2) { await sleep(500 + attempt * 500); continue; }
+                        return [];
+                    }
+                    const text = await r.text();
+                    // The JSONP payload always starts with '({"d"'. A naive indexOf('(') breaks on titles
+                    // with parens ("The Human Centipede (First Sequence)"), and lastIndexOf('(') breaks on
+                    // image URLs inside the payload that contain parens (e.g. "..._V1_(2016).jpg").
+                    const jsonStart = text.indexOf('({"d"');
+                    if (jsonStart === -1) return []; // e.g. Cyrillic queries return percent-encoded garbage
+                    let jsonText = text.slice(jsonStart + 1).trim();
+                    if (jsonText.endsWith(')')) jsonText = jsonText.slice(0, -1);
+                    if (jsonText.endsWith(';')) jsonText = jsonText.slice(0, -1);
+                    if (!jsonText.startsWith('{')) return [];
+                    const data = JSON.parse(jsonText);
+                    return (data.d || []).map((item, idx) => {
+                        if (!item.id?.startsWith('tt')) return null;
+                        return {
+                            ttId: item.id,
+                            title: item.l || '',
+                            titleOrig: item.l || '',
+                            year: String(item.y || ''),
+                            type: item.qid || item.q || '',
+                            suggestRank: idx,
+                        };
+                    }).filter(Boolean);
+                } catch (e) {
+                    if (attempt < 2) { await sleep(300 + attempt * 400); continue; }
+                    console.warn('[mrs] IMDb suggest error:', e.message);
+                    return [];
+                }
+            }
+            console.warn('[mrs] IMDb suggest exhausted retries for:', title);
+            return [];
+        });
+    }
+
+    async function searchIMDbFallback(title, year, deep = false, allTitles = [], src = {}) {
+        const cacheKey = `imdb:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}|${allTitles.slice(0, 3).map(normTitle).join(',')}`;
+        const cached = searchCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+        return dedupeFetch(cacheKey, async () => {
+            // --- Phase 1: Suggest API (fast JSON, ~200ms) ---
+            // Try the primary title first, then transliteration (for Cyrillic) and
+            // non-Cyrillic alt titles (e.g. "Your Name" for "Твоё имя").
+            const suggestQueries = [title];
+            if (hasCyr(title)) suggestQueries.push(translit(title));
+            if (Array.isArray(allTitles)) {
+                for (const alt of allTitles) {
+                    if (alt && alt !== title && alt.length >= 3) suggestQueries.push(alt);
+                }
+            }
+            const suggestCandidates = [];
+            const seenSugg = new Set();
+            for (const q of [...new Set(suggestQueries)]) {
+                const cands = await searchIMDbSuggest(q);
+                for (const c of cands) {
+                    if (seenSugg.has(c.ttId)) continue;
+                    seenSugg.add(c.ttId);
+                    suggestCandidates.push(c);
+                }
+            }
+            // Rank per suggestion query (0 = top result). Only trust top-1 + year when title is unrelated.
+            let best = null;
+            for (const cand of suggestCandidates) {
+                const score = scoreCandidate({ title, titleOrig: title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                const conf = confidenceLabel(score);
+                if (conf === 'high') {
+                    DEBUG && console.log(`[mrs] IMDb suggest HIGH: "${title}" (${year}) → ${cand.ttId} score=${score.toFixed(2)}`);
+                    if (!year || !cand.year || yearsMatch(cand.year, year)) {
+                        const result = { ...cand, score, confidence: conf };
+                        searchCache.set(cacheKey, result);
+                        return result;
+                    }
+                }
+                if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+            }
+
+            // --- Phase 2: HTML fallback (always run, not only deep mode) ---
+            const variants = getTitleVariants(title, allTitles);
+            const qs = [...new Set([...variants, ...(hasCyr(title) ? [translit(title)] : []), ...(title.length < 5 && year ? [] : [])])];
+
+            for (const q of qs) {
+                const r = await fetchT(`https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt`);
+                if (!r?.ok) continue;
+                const html = await r.text();
+                const ids = [...new Set([...html.matchAll(/\/title\/(tt\d+)/g)].map(m => m[1]))];
+                if (!ids.length) continue;
+
+                for (const id of ids.slice(0, 5)) {
+                    let cand = null;
+                    for (const [k, v] of titleMap) {
+                        if (v.ttId === id) {
+                            cand = { ttId: id, title: k, titleOrig: '', year: v.year, type: '' };
+                            break;
+                        }
+                    }
+                    if (!cand) {
+                        const idx = html.indexOf(id);
+                        const context = html.substring(Math.max(0, idx - 300), idx + 300);
+                        const yrMatch = context.match(/\b(19|20)\d{2}\b/);
+                        const nameMatch = context.match(/>([^<]{3,100})</);
+                        const mainTitle = nameMatch ? nameMatch[1].trim() : '';
+                        let origTitle = '';
+                        const origPattern = context.match(/[—–\-|]\s*([^<]{2,200}?)\s*\(original\s*title\)/i);
+                        if (origPattern) {
+                            origTitle = origPattern[1].trim();
+                        } else if (mainTitle && nameMatch) {
+                            const afterIdx = nameMatch.index + nameMatch[0].length;
+                            const afterHtml = context.substring(afterIdx);
+                            const textFrags = afterHtml.split(/<[^>]+>/).map(s => s.trim()).filter(Boolean);
+                            for (const frag of textFrags) {
+                                const fragClean = frag.replace(/\s*\(original\s*title\)\s*/i, '').trim();
+                                const clean = fragClean.replace(/[,;•–—()]+/g, ' ').trim();
+                                if (clean && clean !== mainTitle && clean.length > 3 && !/^\d{4}$/.test(clean) && !clean.includes(mainTitle) && !mainTitle.includes(clean)) {
+                                    origTitle = clean;
+                                    break;
+                                }
+                            }
+                        }
+                        cand = {
+                            ttId: id,
+                            title: mainTitle,
+                            titleOrig: origTitle,
+                            year: yrMatch ? yrMatch[0] : '',
+                            type: '',
+                        };
+                    }
+                    const score = scoreCandidate({ title, titleOrig: title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                    const conf = confidenceLabel(score);
+                    if (conf === 'high') {
+                        DEBUG && console.log(`[mrs] IMDb fallback HIGH: "${title}" (${year}) → ${id} score=${score.toFixed(2)}`);
+                        if (!year || !cand.year || yearsMatch(cand.year, year)) {
+                            const result = { ...cand, score, confidence: conf };
+                            searchCache.set(cacheKey, result);
+                            return result;
+                        }
+                    }
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                }
+            }
+
+            if (best) {
+                DEBUG && console.log(`[mrs] IMDb fallback best: "${title}" (${year}) → ${best.ttId} score=${best.score.toFixed(2)} conf=${best.confidence}`);
+                const yearOk = !best.year || !year || yearsMatch(best.year, year);
+                if (yearOk && (deep ? best.confidence !== 'low' || best.score >= 350 : (best.confidence === 'high' || best.confidence === 'medium' || (best.confidence === 'low' && best.score >= 350)))) {
+                    searchCache.set(cacheKey, best);
+                    return best;
+                }
+            }
+            // Try matching the parent series for episode titles
+            const parent = extractSeriesParent(title);
+            if (parent && parent !== title) {
+                DEBUG && console.log(`[mrs] IMDb trying series parent: "${parent}" for "${title}"`);
+                return searchIMDbFallback(parent, year, deep, allTitles, src);
+            }
+
+            console.warn(`[mrs] IMDb search FAILED: "${title}" (${year})`);
             return null;
         });
     }
 
-    const resolveIMDb = (title, year, deep) => lookupTitle(title, year) ?? (deep ? searchIMDbFallback(title, year) : null);
+    async function resolveIMDb(title, year, deep, allTitles = [], src = {}) {
+        const cached = lookupTitle(title, year);
+        if (cached) {
+            return { ttId: cached, score: 0.95, confidence: 'high' };
+        }
+        return searchIMDbFallback(title, year, deep, allTitles, src);
+    }
 
-    async function imdbApplyPhase(resolved, rated, watched, statusEl, mode, total) {
-        Object.assign(gqlProbe, makeProbe());
-        gqlDelay.val = DELAY.GQL_INIT;
-        let r = 0, w = 0, sk = 0, nf = 0, fa = 0;
+    async function imdbApplyPhase(resolved, rated, watched, statusEl, mode, total, opts = {}) {
+        Object.assign(gqlProbe, makeProbe(20, PLATFORM_MAX.imdb));
+        imdbGqlDelay.val = DELAY.GQL_INIT;
+        let r = 0, w = 0, fav = 0, sk = 0, nf = 0, fa = 0;
         const missed = [];
         const toApply = [];
+        const skippedFavs = [];
 
         for (const { item, ttId } of resolved) {
-            if (!ttId) { nf++; missed.push(item); continue; }
+            if (!ttId) { nf++; missed.push({ ...item, error: t('errorNotFoundIMDb') }); continue; }
             const hasR = item.rating != null && String(item.rating) !== '' && +item.rating >= 1 && +item.rating <= 10;
-            if (mode !== 'replace' && (rated.has(ttId) || (watched.has(ttId) && !hasR))) { sk++; continue; }
+            if (mode !== 'replace' && (rated.has(ttId) || (watched.has(ttId) && !hasR))) {
+                sk++;
+                if (opts.importFavorites && item.favorite) skippedFavs.push({ item, ttId });
+                continue;
+            }
             toApply.push({ item, ttId });
         }
 
         let cur = 0;
         while (cur < toApply.length) {
             const slice = toApply.slice(cur, cur + gqlProbe.c);
-            setStatus(statusEl, t('importProgress', {platform: 'IMDb', from: cur + 1, to: Math.min(cur + gqlProbe.c, toApply.length), total: total}));
+            setStatus(statusEl, t('importProgress', { platform: 'IMDb', from: cur + 1, to: Math.min(cur + gqlProbe.c, toApply.length), total }) + dots());
             const t0 = Date.now();
-            const res = await asyncPool(gqlProbe.c, slice, ({ item, ttId }) => applyIMDb(ttId, item.rating, rated, watched));
+            const res = await asyncPool(gqlProbe.c, slice, ({ item, ttId }) => applyIMDb(ttId, item.rating, rated, watched, opts.importFavorites && item.favorite));
             let fail = false;
             res.forEach((x, j) => {
                 const s = x.status === 'fulfilled' ? x.value : null;
+                const item = slice[j].item;
                 if (s === 'rated') r++;
-                else if (s === t('watched')) w++;
-                else { fa++; missed.push(slice[j].item); fail = true; }
+                else if (s === 'watched') w++;
+                else { fa++; missed.push({ ...item, error: t('errorApi') }); fail = true; }
+                if (item.favorite && (s === 'rated' || s === 'watched')) fav++;
             });
             cur += gqlProbe.c;
             const elapsed = Date.now() - t0;
             fail ? probeFail(gqlProbe) : probeOk(gqlProbe, elapsed);
-            if (cur < toApply.length) await sleep(gqlDelay.val);
+            // No artificial sleep — asyncPool naturally paces requests
         }
-        return { rated: r, watched: w, skipped: sk, notFound: nf, failed: fa, missed };
+
+        // Add favorites for skipped (already-rated) films
+        if (skippedFavs.length) {
+            const listId = await getOrCreateIMDbFavouritesList();
+            if (listId) {
+                try {
+                    const cache = await getIMDbFavCache(listId);
+                    for (const { ttId } of skippedFavs) {
+                        if (!cache.ids.has(ttId)) {
+                            const j = await imdbGql(GQL_ADD_TO_LIST, { input: { listId, item: { itemElementId: ttId } } });
+                            if (j?.data?.addItemToList?.listId) {
+                                cache.ids.add(ttId);
+                                fav++;
+                                DEBUG && console.log(`[mrs] IMDb favorite OK (skipped film): ${ttId}`);
+                            }
+                        } else {
+                            DEBUG && console.log(`[mrs] IMDb favorite skip (already in list): ${ttId}`);
+                        }
+                    }
+                } catch (e) { console.warn(`[mrs] IMDb favorite error for skipped films:`, e.message); }
+            }
+        }
+
+        return { rated: r, watched: w, favorites: fav, skipped: sk, notFound: nf, failed: fa, missed };
     }
 
-    async function imdbProcess(items, rated, watched, statusEl, deep, mode) {
-        Object.assign(kpProbe, makeProbe());
+    async function imdbProcess(items, rated, watched, statusEl, deep, mode, opts = {}) {
+        Object.assign(imdbProbe, makeProbe(30, PLATFORM_MAX.imdb));
         const resolved = [];
         let cur = 0;
         while (cur < items.length) {
-            const slice = items.slice(cur, cur + kpProbe.c);
-            setStatus(statusEl, t('searchProgress', {from: cur + 1, to: Math.min(cur + kpProbe.c, items.length), total: items.length}));
+            const slice = items.slice(cur, cur + imdbProbe.c);
+            setStatus(statusEl, t('searchProgress', { from: cur + 1, to: Math.min(cur + imdbProbe.c, items.length), total: items.length }) + dots(), { current: Math.min(cur + imdbProbe.c, items.length), total: items.length });
             const t0 = Date.now();
-            const res = await asyncPool(kpProbe.c, slice, i =>
-                i.ttId && /^tt\d+$/.test(i.ttId) ? Promise.resolve(i.ttId) : resolveIMDb(i.title, i.year, deep)
-            );
+            const res = await asyncPool(imdbProbe.c, slice, async i => {
+                if (i.ttId && /^tt\d+$/.test(i.ttId)) {
+                    return { ttId: i.ttId, score: 1.0, confidence: 'high' };
+                }
+                return resolveIMDb(i.title, i.year, deep, i.allTitles || [], i);
+            });
             let fail = false;
             res.forEach((r, j) => {
-                const ttId = r.status === 'fulfilled' ? r.value : null;
-                resolved.push({ item: slice[j], ttId });
-                if (!ttId && deep) fail = true;
+                const result = r.status === 'fulfilled' ? r.value : null;
+                const ttId = result?.ttId ?? null;
+                const confidence = result?.confidence ?? 'low';
+                if (!ttId || confidence === 'low' || (!deep && confidence === 'low')) {
+                    resolved.push({ item: slice[j], ttId: null });
+                    if (deep) fail = true;
+                } else {
+                    resolved.push({ item: slice[j], ttId });
+                }
             });
-            cur += kpProbe.c;
+            cur += imdbProbe.c;
             const elapsed = Date.now() - t0;
-            fail ? probeFail(kpProbe) : probeOk(kpProbe, elapsed);
-            if (cur < items.length) await sleep(Math.max(30, elapsed < 300 ? 30 : 60));
+            fail ? probeFail(imdbProbe) : probeOk(imdbProbe, elapsed);
+            if (cur < items.length) await sleep(Math.max(30, elapsed < 100 ? 0 : 25));
         }
-        return imdbApplyPhase(resolved, rated, watched, statusEl, mode, items.length);
+        return imdbApplyPhase(resolved, rated, watched, statusEl, mode, items.length, opts);
     }
 
     function renderIMDbResult(result, statusEl, rated, watched, mode) {
-        const lbl = mode === 'replace' ? ' (режим замены)' : '';
-        renderResult(statusEl, `✅ Готово${lbl}!`, [
+        const lbl = mode === 'replace' ? t('replaceMode') : '';
+        const imdbPairs = [
             [t('rated'), result.rated],
-            ['Просмотрено: ', result.watched],
+            [t('watched'), result.watched],
             [t('skipped'), result.skipped],
             [t('notFound'), result.notFound],
             [t('failed'), result.failed],
-        ], result.notFound === 0 && result.failed === 0 ? t('allImported') : null);
+        ];
+        if (result.favorites != null) imdbPairs.push([t('favorites'), result.favorites]);
+        renderResult(statusEl, t('done', { mode: lbl }), imdbPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
         if (result.missed.length) {
             downloadCSV(buildCSV(result.missed), 'imdb_missed.csv');
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry',
-                className: 'mrs-btn mrs-btn--yellow',
-                textContent: t('deepSearchBtn', {count: result.missed.length}),
+                className: 'mrs-btn mrs-btn--secondary',
+                textContent: t('deepSearchBtn', { count: result.missed.length }),
             });
             btn.addEventListener('click', async () => {
-                setStatus(statusEl, t('deepSearch', {platform: 'Kinopoisk'}));
-                const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode);
+                setStatus(statusEl, t('deepSearch', { platform: 'IMDb' }) + dots());
+                const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode, getImportOptions());
                 renderIMDbResult(r2, statusEl, rated, watched, mode);
             });
-            statusEl.appendChild(document.createElement('br'));
-            statusEl.appendChild(document.createElement('br'));
-            statusEl.appendChild(btn);
+            const btnWrap = document.createElement('div');
+            btnWrap.style.padding = '0 18px 14px';
+            btnWrap.appendChild(btn);
+            statusEl.appendChild(btnWrap);
         }
     }
 
+    // Health-check: test IMDb GraphQL endpoint with a known title before bulk operations
+    async function imdbHealthCheck() {
+        try {
+            // Use imdbGql to reuse existing retry/429/error handling
+            const json = await imdbGql('query { title(id: \"tt0111161\") { id titleText { text } } }', {});
+            return !!(json?.data?.title);
+        } catch (e) { return false; }
+    }
+
     async function performIMDbExport(statusEl) {
-        setStatus(statusEl, t('profileDetect', {platform: 'IMDb'}));
+        setStatus(statusEl, t('profileDetect', { platform: 'IMDb' }) + dots());
         const uid = getIMDbUid();
         if (!uid) throw new Error(t('imdbUserIdNotFound'));
+        // Health-check IMDb GraphQL API
+        const apiOk = await imdbHealthCheck();
+        if (!apiOk) {
+            console.warn('[mrs] IMDb GraphQL API health-check failed — API may be unavailable or changed');
+            setStatus(statusEl, '⚠️ IMDb API may be unavailable — retrying...');
+            await sleep(3000);
+        }
         resetTitleMap(); imdbHistory = null;
 
         const HASH = '7c4e0771d67f21fc27fd44fc46d49cc589225a9c5e63e51cc0b8d42f39ee99cc';
@@ -1166,21 +2593,21 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                 const s = nd?.props?.pageProps?.mainColumnData?.advancedTitleSearch;
                 const edges = s?.edges ?? [];
                 if (!edges.length) break;
-        for (const e of edges) {
-            const n = e?.node?.title ?? e?.node;
-            if (!n?.id?.startsWith('tt') || seen.has(n.id)) continue;
-            seen.add(n.id);
-            const typeTxt = (n?.titleType?.text || '').toLowerCase();
-            items.push({
-                titleRu: '',
-                titleOrig: n?.originalTitleText?.text ?? n?.titleText?.text ?? '',
-                type: typeTxt.includes('series') ? 'TvSeries' : 'Film',
-                ttId: n.id,
-                yearStart: String(n?.releaseYear?.year ?? ''),
-                yearEnd: String(n?.releaseYear?.endYear ?? ''),
-                rating: null,
-            });
-        }
+                for (const e of edges) {
+                    const n = e?.node?.title ?? e?.node;
+                    if (!n?.id?.startsWith('tt') || seen.has(n.id)) continue;
+                    seen.add(n.id);
+                    const typeTxt = (n?.titleType?.text || '').toLowerCase();
+                    items.push({
+                        titleRu: '',
+                        titleOrig: n?.originalTitleText?.text ?? n?.titleText?.text ?? '',
+                        type: typeTxt.includes('series') ? 'TvSeries' : 'Film',
+                        ttId: n.id,
+                        yearStart: String(n?.releaseYear?.year ?? ''),
+                        yearEnd: String(n?.releaseYear?.endYear ?? ''),
+                        rating: null,
+                    });
+                }
                 if (!s?.pageInfo?.hasNextPage) break;
                 await sleep(DELAY.HISTORY_PAGE);
             }
@@ -1189,9 +2616,14 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
 
         // Parallelize ratings + watch history scanning
         const [rated, watched] = await Promise.all([
-            scan((u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t(t('ratings'))),
+            scan((u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings')),
             scan((u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory')),
         ]);
+
+        // Check if any data was found
+        if (rated.length === 0 && watched.length === 0) {
+            throw new Error(t('imdbNoData'));
+        }
 
         // Fetch actual rating values in parallel batches
         const BATCH = 250;
@@ -1199,8 +2631,8 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         for (let i = 0; i < rated.length; i += BATCH) batches.push(rated.slice(i, i + BATCH).map(x => x.ttId));
 
         const results = await Promise.allSettled(batches.map(batch =>
-            fetch(IMDB_GQL, {
-                method: 'POST', credentials: 'include',
+            fetchT(IMDB_GQL, 30000, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     operationName: 'PersonalizedUserData',
@@ -1220,10 +2652,58 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             }
         }
 
-        return buildCSV([...rated, ...watched.map(i => ({ ...i, rating: 'w' }))].map(i => ({ ...i, src: 'imdb' })));
+        let favIds = new Set();
+        try {
+            const favListId = await getIMDbFavouritesList();
+            if (favListId) {
+                const j = await imdbGql(`query GetListTitles($listId: ID!, $limit: Int!) { list(listId: $listId) { listItems(limit: $limit) { listItem { item { id } } } } }`, { listId: favListId, limit: 10000 });
+                const items = j?.data?.list?.listItems ?? [];
+                for (const it of items) {
+                    const id = it?.listItem?.item?.id;
+                    if (id) favIds.add(id);
+                }
+            }
+        } catch (e) { console.warn('[mrs] IMDb fetch favourites error:', e.message); }
+
+        const allItems = [...rated, ...watched.map(i => ({ ...i, rating: 'w' }))];
+        const itemMap = new Map(allItems.map(i => [i.ttId, i]));
+        for (const ttId of favIds) {
+            if (itemMap.has(ttId)) itemMap.get(ttId).favorite = true;
+            else itemMap.set(ttId, { titleRu: '', titleOrig: '', allTitles: [], type: 'Film', ttId, yearStart: '', yearEnd: '', rating: '', favorite: true, src: 'imdb' });
+        }
+
+        // Fetch film details (titles + extended metadata) from IMDb film pages
+        const uniqueItems = [...itemMap.values()];
+        setStatus(statusEl, `Fetching film details for ${uniqueItems.length} films...` + dots());
+        const imdbRateLimit = makeRateLimiter(15);
+        const titleResults = await asyncPool(25, uniqueItems, async i => {
+            if (!i.ttId) return null;
+            const cacheKey = 'imdb:' + i.ttId;
+            const cached = filmDetailCache.get(cacheKey);
+            if (cached) return cached;
+            await imdbRateLimit();
+            const result = await imdbFetchFilmDetailsHTML(i.ttId);
+            if (result) filmDetailCache.set(cacheKey, result);
+            return result;
+        });
+        titleResults.forEach((r, i) => {
+            const item = uniqueItems[i];
+            if (r.status === 'fulfilled' && r.value) {
+                item.allTitles = [...new Set([item.titleOrig, item.titleRu, ...(item.allTitles || []), ...r.value.allTitles.map(decodeHtmlEntities)].filter(Boolean))];
+                if (r.value.rating != null && item.rating == null) item.rating = r.value.rating;
+                item.runtime = r.value.runtime;
+                item.directors = r.value.directors;
+                item.actors = r.value.actors;
+                item.genres = r.value.genres;
+                item.premiereDate = r.value.premiereDate;
+            }
+        });
+
+        filmDetailCache.flush();
+        return buildCSV([...itemMap.values()].map(i => ({ ...i, allTitles: [...new Set([i.titleOrig, i.titleRu, ...(i.allTitles || [])].filter(Boolean))], src: 'imdb' })));
     }
 
-    async function performIMDbImport(csvData, statusEl, mode) {
+    async function performIMDbImport(csvData, statusEl, mode, deep = false, opts = {}) {
         const items = parseCSV(csvData);
         if (!items.length) return setStatus(statusEl, t('csvEmpty'));
         imdbHistory = null;
@@ -1232,11 +2712,16 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         const uid = getIMDbUid();
         if (!uid) return setStatus(statusEl, t('imdbUserIdNotFound'));
 
-        setStatus(statusEl, t('loadedRecords', {count: items.length, next: t('scanHistory', {platform: 'IMDb'})}));
-        const { rated, watched } = await getIMDbHistory(statusEl);
-        if (mode === 'replace') { rated.clear(); watched.clear(); }
+        setStatus(statusEl, t('loadedRecords', { count: items.length, next: t('scanHistory', { platform: 'IMDb' }) }) + dots());
+        // Skip history scan if importing items without IMDb IDs (e.g. from Letterboxd)
+        let rated, watched;
+        ({ rated, watched } = await getIMDbHistory(statusEl));
+        if (mode === 'replace') { rated = new Set(rated); watched = new Set(watched); }
 
-        const result = await imdbProcess(items, rated, watched, statusEl, false, mode);
+        const shouldDeep = deep;
+        const t0 = Date.now();
+        const result = await imdbProcess(items, rated, watched, statusEl, shouldDeep, mode, opts);
+        result.elapsedMs = Date.now() - t0;
         renderIMDbResult(result, statusEl, rated, watched, mode);
     }
 
@@ -1255,7 +2740,7 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         // Primary: Letterboxd sets `person` global on every page for logged-in users
         try {
             if (typeof person !== 'undefined' && person?.loggedIn && person?.username) return person.username;
-        } catch { }
+        } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
         // Fallback: URL path (only works on profile pages)
         const m = location.pathname.match(/^\/([^/]+)\/?$/);
         const excluded = new Set(['films', 'lists', 'members', 'journal', 'search', 'activity', 'import', 'settings', 'create-account', 'sign-in', 'about', 'pro', 'apps', 'contact', 'legal', 'stats', 'year-in-review', 'gift-guide', 'welcome', 'crew', 'api-beta', 'podcast']);
@@ -1271,14 +2756,14 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
 
     function getLBCsrf() {
         // Primary: supermodelCSRF is set as a global JS variable on every Letterboxd page
-        try { if (typeof supermodelCSRF !== 'undefined' && supermodelCSRF) return supermodelCSRF; } catch { }
+        try { if (typeof supermodelCSRF !== 'undefined' && supermodelCSRF) return supermodelCSRF; } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
         // Fallback: window.csrf
-        try { if (typeof window.csrf !== 'undefined' && window.csrf) return window.csrf; } catch { }
+        try { if (typeof window.csrf !== 'undefined' && window.csrf) return window.csrf; } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
         // Fallback: cookie (may be HttpOnly, so often unreadable)
         try {
             const c = document.cookie.match(/\bcom\.xk72\.webparts\.csrf=([^;]+)/);
             if (c) return decodeURIComponent(c[1]);
-        } catch { }
+        } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
         // Fallback: DOM elements
         return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
             ?? document.querySelector('input[name="__csrf"]')?.value
@@ -1287,13 +2772,14 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
 
     // Fast regex-based parsers for Letterboxd (replaces DOMParser, ~100x faster)
     // Updated for Letterboxd's React-based grid layout (2026)
-    const LB_GRIDITEM_RE = /<li[^>]*class="[^"]*griditem[^"]*"[^>]*>([\s\S]*?)<\/li>/g;
-    const LB_SLUG_RE = /data-item-slug="([^"]+)"/;
+    const LB_GRIDITEM_RE = /<li[^>]*class="[^"]*(?:griditem|poster-container)[^"]*"[^>]*>([\s\S]*?)<\/li>/g;
+    const LB_SLUG_RE = /data-(?:item|film)-slug="([^"]+)"/;
     const LB_NAME_RE = /data-item-name="([^"]+)"/;
-    const LB_ITEM_UID_RE = /data-item-uid="film:(\d+)"/;
+    const LB_ITEM_UID_RE = /(?:data-item-uid="film:(\d+)"|data-film-id="(\d+)")/;
     const LB_RATED_RE = /class="[^"]*rated-(\d+)[^"]*"/;
     const LB_GRIDITEM_JSON_RE = /data-postered-identifier='([^']+)'/;
     const LB_DIARY_ROW_RE = /<tr[^>]*class="[^"]*diary-entry-row[^"]*"[^>]*>([\s\S]*?)<\/tr>/g;
+    const LB_POSTER_LI_RE = /<li[^>]*>([\s\S]*?)<\/li>/g;
     const LB_DIARY_DATE_RE = /<td[^>]*class="[^"]*td-day[^"]*"[^>]*>[\s\S]*?(\d{4}\/\d{2}\/\d{2})/;
     const LB_TIME_DATETIME_RE = /<time[^>]+datetime="([^"]+)"/;
     const LB_PAGINATION_NEXT_RE = /<a[^>]*(?:class="[^"]*next[^"]*"|rel="next")[^>]*>/;
@@ -1301,40 +2787,77 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
     async function fetchLBHtml(url) {
         for (let attempt = 0; attempt < 3; attempt++) {
             const r = await fetchT(url, 15000);
-            if (r?.status === 429) { await sleep(2000 + attempt * 2000); continue; }
-            if (!r?.ok) return null;
+            if (!r) {
+                await sleep(500 + attempt * 500);
+                continue;
+            }
+            if (r.status === 429) {
+                const ra = parseRetryAfter(r.responseHeaders);
+                await sleep(ra || (1000 + attempt * 800));
+                continue;
+            }
+            if (!r.ok) {
+                if (r.status === 404) return null;
+                // Detect Cloudflare challenge (403/503) — stop retrying with a warning
+                if (r.status === 403 || r.status === 503) {
+                    const body = await r.text().catch(() => '');
+                    if (isCloudflareChallenge(r.status, body)) {
+                        console.warn(`[mrs] Cloudflare challenge detected (${r.status}) for ${url} — stopping retries`);
+                        return null;
+                    }
+                }
+                await sleep(500 + attempt * 500);
+                continue;
+            }
             return await r.text();
         }
         return null;
     }
 
     function parseLBRatings(html) { return parseLBItems(html, 'grid'); }
-    function parseLBDiary(html) { return parseLBItems(html, t('diary')); }
-    function parseLBWatched(html) { return parseLBItems(html, 'grid'); }
+    function parseLBDiary(html) { return parseLBItems(html, 'diary'); }
+    const parseLBWatched = parseLBRatings;
 
     function parseLBItems(html, mode) {
         const results = [];
         let sources = [];
-        if (mode === t('diary')) {
+        if (mode === 'diary') {
             const diary = [...html.matchAll(LB_DIARY_ROW_RE)];
             if (diary.length) sources = diary.map(m => m[1]);
             else sources = [...html.matchAll(LB_GRIDITEM_RE)].map(m => m[1]);
         } else {
             sources = [...html.matchAll(LB_GRIDITEM_RE)].map(m => m[1]);
+            if (!sources.length) sources = [...html.matchAll(LB_POSTER_LI_RE)].map(m => m[1]);
         }
         for (const liHtml of sources) {
-            const slug = liHtml.match(LB_SLUG_RE)?.[1];
-            if (!slug) continue;
+            let slug = (liHtml.match(LB_SLUG_RE)?.[1] || '').replace(/^\/film\//, '').replace(/\/$/, '');
+            if (!slug) {
+                let fallbackFilmId = '';
+                const jsonMatch3 = liHtml.match(LB_GRIDITEM_JSON_RE);
+                if (jsonMatch3) {
+                    try { const d3 = JSON.parse(jsonMatch3[1].replace(/&quot;/g, '"')); fallbackFilmId = d3?.uid?.replace('film:', '') ?? ''; } catch (e3) {}
+                }
+                if (!fallbackFilmId) {
+                    const uidMatch3 = liHtml.match(LB_ITEM_UID_RE);
+                    if (uidMatch3) fallbackFilmId = (uidMatch3[1] || uidMatch3[2] || '').replace('film:', '');
+                }
+                if (!fallbackFilmId) continue;
+                slug = 'film:' + fallbackFilmId;
+            }
             let filmId = '';
             const jsonMatch = liHtml.match(LB_GRIDITEM_JSON_RE);
             if (jsonMatch) {
-                try { const d = JSON.parse(jsonMatch[1]); filmId = d?.uid?.replace('film:', '') ?? ''; } catch { }
+                try { const d = JSON.parse(jsonMatch[1]); filmId = d?.uid?.replace('film:', '') ?? ''; } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
             }
-            if (!filmId) filmId = liHtml.match(LB_ITEM_UID_RE)?.[1] ?? '';
+            if (!filmId) {
+                const uidMatch = liHtml.match(LB_ITEM_UID_RE);
+                filmId = uidMatch ? (uidMatch[1] || uidMatch[2] || '') : '';
+            }
             const nameMatch = liHtml.match(LB_NAME_RE);
-            const fullName = nameMatch ? nameMatch[1] : '';
-            const yearMatch = fullName.match(/\((\d{4}(?:-\d{4})?)\)\s*$/);
-            const title = yearMatch ? fullName.replace(/\s*\(\d{4}(?:-\d{4})?\)\s*$/, '').trim() : fullName;
+            const altMatch = liHtml.match(/<img[^>]*alt="([^"]+)"/);
+            const rawName = (nameMatch ? nameMatch[1] : '') || (altMatch ? altMatch[1] : '');
+            const yearMatch = rawName.match(/\((\d{4}(?:-\d{4})?)\)\s*$/);
+            const title = yearMatch ? rawName.replace(/\s*\(\d{4}(?:-\d{4})?\)\s*$/, '').trim() : rawName;
             const year = yearMatch ? yearMatch[1] : '';
             const ratingMatch = liHtml.match(LB_RATED_RE);
             const rating = ratingMatch ? parseInt(ratingMatch[1], 10) : null;
@@ -1347,17 +2870,441 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
 
     async function lbScrapePages(username, pathFn, parseFn, label, statusEl, maxPages = 200) {
         const all = [];
-        for (let p = 1; p <= maxPages; p++) {
-            setStatus(statusEl, `${label}: ${t('page')} ${p}${dots()}`);
-            const html = await fetchLBHtml(pathFn(username, p));
+        // Phase 1: Fetch first 3 pages in parallel to discover total page count
+        setStatus(statusEl, `${label}: ${t('page')} 1-3${dots()}`);
+        const initialPages = await Promise.all([1, 2, 3].map(p => fetchLBHtml(pathFn(username, p)).catch(() => null)));
+        let lastPageWithData = 0;
+        let hasMore = false;
+        for (let i = 0; i < initialPages.length; i++) {
+            const html = initialPages[i];
             if (!html) break;
             const items = parseFn(html);
             if (!items.length) break;
             all.push(...items);
-            if (!html.match(LB_PAGINATION_NEXT_RE)) break;
-            await sleep(200);
+            lastPageWithData = i + 1;
+            if (html.match(LB_PAGINATION_NEXT_RE)) hasMore = true;
+        }
+        // Phase 2: Fetch remaining pages in parallel with low concurrency (Cloudflare-safe)
+        if (hasMore && lastPageWithData >= 3) {
+            const remaining = [];
+            for (let p = 4; p <= maxPages; p++) remaining.push(p);
+            if (remaining.length > 0) {
+                setStatus(statusEl, `${label}: ${t('page')} 4-${maxPages} (${all.length} ${t('movies')})${dots()}`);
+                const poolResults = await asyncPool(5, remaining, async (p) => {
+                    const html = await fetchLBHtml(pathFn(username, p));
+                    if (!html) return [];
+                    const items = parseFn(html);
+                    if (!items.length) return null; // signal: no more pages
+                    return items;
+                });
+                for (const r of poolResults) {
+                    if (r.status !== 'fulfilled' || !r.value) break;
+                    all.push(...r.value);
+                }
+            }
+        } else if (hasMore && lastPageWithData < 3) {
+            // Fallback: sequential for pages after initial batch (if initial had < 3 pages)
+            for (let p = lastPageWithData + 1; p <= maxPages; p++) {
+                setStatus(statusEl, `${label}: ${t('page')} ${p} (${all.length} ${t('movies')})${dots()}`);
+                const html = await fetchLBHtml(pathFn(username, p));
+                if (!html) break;
+                const items = parseFn(html);
+                if (!items.length) break;
+                all.push(...items);
+                if (!html.match(LB_PAGINATION_NEXT_RE)) break;
+                await sleep(200);
+            }
         }
         return all;
+    }
+
+    async function lbFetchFilmDetails(slug) {
+        if (!slug) return null;
+        const url = `https://letterboxd.com/film/${slug}/`;
+        return fetchWithRetry(url, html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            // Prefer schema.org JSON-LD for metadata.
+            const schema = extractSchemaOrg(html, url);
+            const altTitles = [];
+            let originalTitle = '', runtime = '', directors = '', actors = '', genres = '', premiereDate = '';
+            if (schema) {
+                originalTitle = schema.title || '';
+                if (schema.altTitles?.length) altTitles.push(...schema.altTitles);
+                runtime = schema.runtime || '';
+                directors = schema.directors || '';
+                actors = schema.actors || '';
+                genres = schema.genres || '';
+                premiereDate = schema.premiereDate || '';
+            }
+            // Fallback: original title via CSS selector
+            // Parse __NEXT_DATA__ for additional structured data (Next.js SSR state)
+            try {
+                // __NEXT_DATA__ is a SECONDARY fallback — Schema.org JSON-LD is primary.
+                // Note: Letterboxd does not use Next.js natively; this may be a React hydration blob.
+                // If __NEXT_DATA__ disappears in future updates, Schema.org will still work.
+                const ndMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+                if (ndMatch) {
+                    const nd = JSON.parse(ndMatch[1]);
+                    const film = nd?.props?.pageProps?.film;
+                    if (film) {
+                        if (!originalTitle) {
+                            originalTitle = decodeHtmlEntities(film.originalName || film.alternateTitle || '');
+                        }
+                        if (!altTitles.length && film.alternateNames?.length) {
+                            for (const n of film.alternateNames) {
+                                const name = typeof n === 'string' ? n : n?.name;
+                                if (name) altTitles.push(decodeHtmlEntities(name));
+                            }
+                        }
+                        if (!runtime && film.runTime) runtime = String(film.runTime);
+                        if (!directors && film.directors?.length) directors = film.directors.map(d => decodeHtmlEntities(d.name || d)).filter(Boolean).join(', ');
+                        if (!actors && film.cast?.length) actors = film.cast.slice(0, 10).map(a => decodeHtmlEntities(a.name || a)).filter(Boolean).join(', ');
+                        if (!genres && film.genres?.length) genres = film.genres.map(g => g.name || g).filter(Boolean).join(', ');
+                        if (!premiereDate && film.releaseDate) premiereDate = film.releaseDate;
+                    }
+                }
+            } catch (e) { /* __NEXT_DATA__ parse failed, continuing with HTML fallbacks */ }
+
+            if (!originalTitle) {
+                const origEl = doc.querySelector('h2.originalname em.quoted-creative-work-title');
+                if (origEl) originalTitle = decodeHtmlEntities(origEl.textContent.trim());
+            }
+            if (!originalTitle) {
+                DEBUG && console.log('[mrs] LB no original title found for', slug);
+            }
+            // Fallback: alternative titles via heading + adjacent div
+            if (!altTitles.length) {
+                const headings = doc.querySelectorAll('h3, h4');
+                for (const h of headings) {
+                    const label = (h.textContent || '').trim();
+                    if (label.toLowerCase() === 'alternative titles') {
+                        let div = h.nextElementSibling;
+                        if (div && !div.classList.contains('text-indentedlist')) {
+                            div = div.querySelector('.text-indentedlist');
+                        }
+                        if (div) {
+                            const text = div.textContent.replace(/\s+/g, ' ').trim();
+                            for (const part of text.split(/,\s+|\s+\|\s+|\s+\/\s+/)) {
+                                const trimmed = part.trim();
+                                if (trimmed) altTitles.push(decodeHtmlEntities(trimmed));
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!altTitles.length) {
+                DEBUG && console.log('[mrs] LB no alternative titles found for', slug);
+            }
+            return { originalTitle, alternativeTitles: altTitles, runtime, directors, actors, genres, premiereDate };
+        }, slug, { name: 'LB film detail fetch', jitter: 300 });
+    }
+
+    // Rate limiter: ensures at least `minIntervalMs` between successive calls.
+    function makeRateLimiter(minIntervalMs) {
+        let last = 0;
+        return async () => {
+            const now = Date.now();
+            const wait = Math.max(0, last + minIntervalMs - now);
+            if (wait > 0) await sleep(wait);
+            last = Date.now();
+        };
+    }
+
+    // Fetch helper with retries, exponential backoff, and 429 handling.
+    // `parser(html)` should return the parsed value or null/throw on failure.
+    async function fetchWithRetry(url, parser, id, opts = {}) {
+        const name = opts.name || 'fetch';
+        for (let attempt = 1; attempt <= RETRY.FETCH; attempt++) {
+            try {
+                // Jitter before each request to spread concurrent load
+                if (opts.jitter) await sleep(Math.random() * opts.jitter);
+                const r = await fetchT(url, opts.timeout || 15000);
+                if (!r) {
+                    if (attempt < RETRY.FETCH) await sleep(500 * attempt + Math.random() * 200);
+                    continue;
+                }
+                if (r.status === 429) {
+                    const ra = parseRetryAfter(r.responseHeaders);
+                    const backoff = ra || Math.min(30000, 1000 * Math.pow(2, attempt) + Math.random() * 1000);
+                    console.warn(`[mrs] ${name} 429 for ${id}, backing off ${Math.round(backoff)}ms`);
+                    await sleep(backoff);
+                    continue;
+                }
+                if (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429) {
+                    DEBUG && console.log(`[mrs] ${name} ${r.status} for ${id}, skipping`);
+                    return null;
+                }
+                if (!r.ok) {
+                    if (attempt < RETRY.FETCH) await sleep(500 * attempt + Math.random() * 200);
+                    continue;
+                }
+                const html = await r.text();
+                return parser(html);
+            } catch (e) {
+                console.warn(`[mrs] ${name} failed for ${id}:`, e.message);
+                if (attempt < RETRY.FETCH) await sleep(500 * attempt + Math.random() * 200);
+            }
+        }
+        return null;
+    }
+
+    async function imdbFetchFilmDetailsGQL(ttId) {
+        try {
+            const vars = { tConst: ttId };
+            const json = await imdbGql(IMDB_TITLE_QUERY, vars);
+            if (!json?.data?.title) return null;
+            const t = json.data.title;
+            const allTitles = [];
+            if (t.titleText?.text) allTitles.push(decodeHtmlEntities(t.titleText.text));
+            if (t.originalTitleText?.text) allTitles.push(decodeHtmlEntities(t.originalTitleText.text));
+            for (const edge of (t.akas?.edges || [])) {
+                if (edge?.node?.text) allTitles.push(decodeHtmlEntities(edge.node.text));
+            }
+            let rating = null;
+            if (t.userRating?.value != null) rating = t.userRating.value;
+            let runtime = '';
+            if (t.runtime?.seconds) runtime = String(Math.floor(t.runtime.seconds / 60));
+            let premiereDate = '';
+            if (t.releaseYear?.year) premiereDate = String(t.releaseYear.year);
+            const genres = (t.genres?.genres || []).map(g => g?.text).filter(Boolean).join(', ');
+            const directors = [], actors = [];
+            for (const cat of (t.principalCredits || [])) {
+                const catText = (cat?.category?.text || '').toLowerCase();
+                for (const credit of (cat?.credits || [])) {
+                    const name = decodeHtmlEntities(credit?.name?.nameText?.text || '');
+                    if (!name) continue;
+                    if (catText === 'director' || catText === 'directors') {
+                        if (directors.length < 3) directors.push(name);
+                    } else if (catText === 'actor' || catText === 'actress' || catText === 'cast' || catText === 'star') {
+                        if (actors.length < 3) actors.push(name);
+                    }
+                }
+            }
+            return {
+                allTitles: [...new Set(allTitles.filter(Boolean))],
+                rating,
+                runtime,
+                directors: directors.join(', '),
+                actors: actors.join(', '),
+                genres,
+                premiereDate,
+            };
+        } catch (e) {
+            if (DEBUG) console.warn('[mrs] IMDb GQL detail fetch failed, falling back to HTML:', e.message);
+            return null;
+        }
+    }
+    async function imdbFetchFilmDetailsHTML(ttId) {
+        if (!ttId || !/^tt\d+$/.test(ttId)) return null;
+        const gqlResult = await imdbFetchFilmDetailsGQL(ttId);
+        if (gqlResult) return gqlResult;
+        // Fallback: fetch HTML pages (main + releaseinfo) in parallel
+        const mainUrl = `https://www.imdb.com/title/${ttId}/`;
+        const releaseUrl = `https://www.imdb.com/title/${ttId}/releaseinfo/`;
+        const [mainResult, releaseResult] = await Promise.all([
+            fetchWithRetry(mainUrl, html => {
+                // Prefer schema.org JSON-LD for directors/actors/genres/runtime.
+                const schema = extractSchemaOrg(html, mainUrl);
+                const allTitles = [];
+                let rating = null, runtime = '', directors = '', actors = '', genres = '', premiereDate = '';
+                if (schema) {
+                    if (schema.title) allTitles.push(decodeHtmlEntities(schema.title));
+                    if (schema.altTitles?.length) allTitles.push(...schema.altTitles.map(decodeHtmlEntities));
+                    runtime = schema.runtime || '';
+                    directors = schema.directors || '';
+                    actors = schema.actors || '';
+                    genres = schema.genres || '';
+                    premiereDate = schema.premiereDate || '';
+                }
+                // Fallback to __NEXT_DATA__ for alternative titles and any missing fields.
+                try {
+                    const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+                    if (m) {
+                        const json = JSON.parse(m[1]);
+                        const data = json?.props?.pageProps?.mainColumnData || {};
+                        const akas = data?.akas?.edges || [];
+                        for (const edge of akas) {
+                            const text = decodeHtmlEntities(edge?.node?.text);
+                            if (text) allTitles.push(text);
+                        }
+                        if (!runtime && data?.runtime?.displayText) runtime = String(parseInt(data.runtime.displayText, 10) || '');
+                        if (!runtime && data?.runtime?.seconds) runtime = String(Math.floor(data.runtime.seconds / 60));
+                        if (!premiereDate && data?.releaseDate?.day && data?.releaseDate?.month && data?.releaseDate?.year) {
+                            premiereDate = `${data.releaseDate.year}-${String(data.releaseDate.month).padStart(2, '0')}-${String(data.releaseDate.day).padStart(2, '0')}`;
+                        }
+                        if (!premiereDate && data?.releaseYear?.year) premiereDate = String(data.releaseYear.year);
+                        // Extract user rating from already-parsed JSON
+                        const aboveFold = json?.props?.pageProps?.aboveTheFoldData;
+                        if (aboveFold?.userRating?.value != null) rating = aboveFold.userRating.value;
+                        else if (data?.userRating?.value != null) rating = data.userRating.value;
+                    }
+                } catch (e) { /* ignore fallback errors */ }
+                return { allTitles, rating, runtime, directors, actors, genres, premiereDate };
+            }, ttId, { name: 'IMDb film details fetch', jitter: 300 }),
+            fetchWithRetry(releaseUrl, html => {
+                // Extract full AKA list from __NEXT_DATA__ on releaseinfo page
+                const allTitles = [];
+                try {
+                    const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+                    if (m) {
+                        const json = JSON.parse(m[1]);
+                        const data = json?.props?.pageProps;
+                        if (data) {
+                            // AKAs are nested in mainColumnData on releaseinfo page
+                            const akas = data?.mainColumnData?.akas?.edges
+                                || data?.akas?.edges
+                                || [];
+                            for (const edge of akas) {
+                                const text = decodeHtmlEntities(edge?.node?.text);
+                                if (text) allTitles.push(text);
+                            }
+                        }
+                    }
+                } catch (e) { /* ignore */ }
+                return { allTitles };
+            }, ttId, { name: 'IMDb releaseinfo fetch', jitter: 300 }),
+        ]);
+        const allTitles = [...new Set([
+            ...(mainResult?.allTitles || []),
+            ...(releaseResult?.allTitles || []),
+        ].filter(Boolean))];
+        return {
+            allTitles,
+            rating: mainResult?.rating ?? null,
+            runtime: mainResult?.runtime || '',
+            directors: mainResult?.directors || '',
+            actors: mainResult?.actors || '',
+            genres: mainResult?.genres || '',
+            premiereDate: mainResult?.premiereDate || '',
+        };
+    }
+
+    async function kpFetchFilmDetailsGQL(kpId) {
+        try {
+            const vars = { id: +kpId };
+            const json = await kpGql(KP_FILM_DETAIL_QUERY, vars, 'FilmDetail');
+            if (!json?.data?.movie?.film) return null;
+            const film = json.data.movie.film;
+            const allTitles = [];
+            if (film.title?.russian) allTitles.push(decodeHtmlEntities(film.title.russian));
+            if (film.title?.original) allTitles.push(decodeHtmlEntities(film.title.original));
+            for (const a of (film.title?.alternative || [])) { if (a?.name) allTitles.push(decodeHtmlEntities(a.name)); }
+            let runtime = film.duration != null ? String(film.duration) : '';
+            let premiereDate = film.premiereWorld?.date || '';
+            const genres = (film.genres || []).map(g => g?.name).filter(Boolean).join(', ');
+            const directors = [], actors = [];
+            for (const p of (film.persons || [])) {
+                const name = decodeHtmlEntities(p?.name?.russian || p?.name?.original || '');
+                if (!name) continue;
+                const prof = (p.professionText || '').toLowerCase();
+                if (prof.includes('режиссер') || prof.includes('director') || prof.includes('режиссёр')) {
+                    if (directors.length < 3) directors.push(name);
+                } else if (prof.includes('актер') || prof.includes('actor') || prof.includes('актёр')) {
+                    if (actors.length < 3) actors.push(name);
+                }
+            }
+            return {
+                allTitles: [...new Set(allTitles.filter(Boolean))],
+                runtime,
+                directors: directors.join(', '),
+                actors: actors.join(', '),
+                genres,
+                premiereDate: premiereDate ? String(premiereDate).split('T')[0] : '',
+            };
+        } catch (e) {
+            if (DEBUG) console.warn('[mrs] KP GQL detail fetch failed, falling back to HTML:', e.message);
+            return null;
+        }
+    }
+    let _kpGqlFailureTime = 0;  // timestamp of last GQL failure streak; 60s backoff after failures
+    async function kpFetchFilmDetailsHTML(kpId) {
+        if (!kpId || !/^\d+$/.test(String(kpId))) return null;
+        let gqlResult = null;
+        const backoffUntil = _kpGqlFailureTime + 60000;
+        if (Date.now() >= backoffUntil) {
+            gqlResult = await kpFetchFilmDetailsGQL(kpId);
+            if (gqlResult) { _kpGqlFailureTime = 0; }
+            else {
+                if (_kpGqlFailureTime === 0) _kpGqlFailureTime = Date.now();
+                console.warn("[mrs] KP GQL failed for kpId=");
+            }
+        } else {
+            DEBUG && console.log("[mrs] KP GQL on backoff, skipping for kpId=");
+        }
+        if (gqlResult) return gqlResult;
+        // Fallback: fetch HTML page (avoid recursion)
+        const url = `https://www.kinopoisk.ru/film/${kpId}/`;
+        return fetchWithRetry(url, html => {
+            // Prefer schema.org JSON-LD for directors/actors/genres/runtime.
+            const schema = extractSchemaOrg(html, url);
+            const allTitles = [];
+            let runtime = '', directors = '', actors = '', genres = '', premiereDate = '';
+            if (schema) {
+                if (schema.title) allTitles.push(decodeHtmlEntities(schema.title));
+                if (schema.altTitles?.length) allTitles.push(...schema.altTitles.map(decodeHtmlEntities));
+                runtime = schema.runtime || '';
+                directors = schema.directors || '';
+                actors = schema.actors || '';
+                genres = schema.genres || '';
+                premiereDate = schema.premiereDate || '';
+            }
+            // Fallback to SSR Apollo state for alternative titles and crew.
+            try {
+                const ssrMatch = html.match(/window\.Ya\.__ssr_initial_data\s*=\s*({[\s\S]*?});?\s*<\/script>/);
+                if (ssrMatch) {
+                    let ssr = JSON.parse(ssrMatch[1]);
+                    const state = ssr?.apolloState;
+                    if (state) {
+                        const movieEntry = Object.values(state).find(v => v && v.__typename && (v.__typename === 'Film' || v.__typename === 'TvSeries' || v.__typename === 'MiniSeries' || v.__typename === 'TvShow'));
+                        if (movieEntry) {
+                            const movie = movieEntry;
+                            if (movie.title?.russian) allTitles.push(decodeHtmlEntities(movie.title.russian));
+                            if (movie.title?.original) allTitles.push(decodeHtmlEntities(movie.title.original));
+                            if (Array.isArray(movie.title?.alternative)) {
+                                for (const t of movie.title.alternative) {
+                                    if (t?.name) allTitles.push(decodeHtmlEntities(t.name));
+                                }
+                            }
+                            if (!runtime && movie.duration != null) runtime = String(movie.duration);
+                            if (!premiereDate) premiereDate = movie.premiereWorld?.date || movie.premiereWorld || '';
+                            const crew = movie.crew || movie.creators || movie.directors;
+                            const dirNames = [];
+                            if (Array.isArray(crew) && !directors) {
+                                for (const c of crew) {
+                                    const person = c?.__ref ? state[c.__ref] : c;
+                                    if (!person) continue;
+                                    const name = decodeHtmlEntities(person.name?.russian || person.name?.original || person.name);
+                                    if (!name) continue;
+                                    const prof = (person.profession || person.professionName || '').toLowerCase();
+                                    if (prof.includes('director') || prof.includes('режиссер')) dirNames.push(name);
+                                }
+                                directors = dirNames.slice(0, 3).join(', ');
+                            }
+                            const cast = movie.cast || movie.actors;
+                            const actorNames = [];
+                            if (Array.isArray(cast) && !actors) {
+                                for (const a of cast) {
+                                    const person = a?.__ref ? state[a.__ref] : a;
+                                    if (!person) continue;
+                                    const name = decodeHtmlEntities(person.name?.russian || person.name?.original || person.name);
+                                    if (name) actorNames.push(name);
+                                }
+                                actors = actorNames.slice(0, 3).join(', ');
+                            }
+                        }
+                    }
+                }
+            } catch (e) { /* ignore fallback errors */ }
+            return {
+                allTitles: [...new Set(allTitles.filter(Boolean))],
+                runtime,
+                directors,
+                actors,
+                genres,
+                premiereDate: premiereDate ? String(premiereDate).split('T')[0] : '',
+            };
+        }, kpId, { name: 'KP film details fetch', jitter: 300 });
     }
 
     async function performLBExport(statusEl) {
@@ -1374,139 +3321,202 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             if (i.filmId && !ex.filmId) ex.filmId = i.filmId;
         });
 
-        const [ratings, diary, watched] = await Promise.all([
-            lbScrapePages(username, (u, p) => `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, t('ratings'), statusEl),
-            lbScrapePages(username, (u, p) => `https://letterboxd.com/${u}/films/diary/page/${p}/`, parseLBDiary, t(t('diary')), statusEl),
-            lbScrapePages(username, (u, p) => `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, t(t('watched')), statusEl),
+        const [ratings, diary, watched, liked] = await Promise.all([
+            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, t('ratings'), statusEl),
+            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/diary/` : `https://letterboxd.com/${u}/films/diary/page/${p}/`, parseLBDiary, t('diary'), statusEl),
+            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, t('watched'), statusEl),
+            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/likes/` : `https://letterboxd.com/${u}/likes/page/${p}/`, parseLBWatched, t('likes'), statusEl).catch(e => { console.error('[mrs] LB likes/films scrape failed:', e); return []; }),
         ]);
 
         merge(ratings);
         merge(diary);
         merge(watched);
+        const likedSlugs = new Set(liked.map(i => i.slug).filter(Boolean));
 
-        const rows = [...map.values()].map(i => ({
-            titleRu: '',
-            titleOrig: i.title || i.slug,
-            type: 'Film',
-            lbSlug: i.slug || '',
-            yearStart: i.year || '',
-            rating: i.rating ?? null,
-            watchedDate: i.watchedDate ?? '',
-            src: 'lb',
-        }));
-        setStatus(statusEl, t('foundCount', {count: rows.length}));
+        // Fetch film details for films in parallel
+        const uniqueItems = [...map.values()];
+        setStatus(statusEl, `Fetching film details for ${uniqueItems.length} films...` + dots());
+        const lbRateLimit = makeRateLimiter(15);
+        const details = await asyncPool(25, uniqueItems, async i => {
+            if (!i.slug) return null;
+            const cacheKey = 'lb:' + i.slug;
+            const cached = filmDetailCache.get(cacheKey);
+            if (cached) return cached;
+            await lbRateLimit();
+            const result = await lbFetchFilmDetails(i.slug);
+            if (result) filmDetailCache.set(cacheKey, result);
+            return result;
+        });
+        details.forEach((r, i) => {
+            const item = uniqueItems[i];
+            if (r.status === 'fulfilled' && r.value) {
+                item.originalTitle = r.value.originalTitle;
+                item.alternativeTitles = r.value.alternativeTitles;
+                item.runtime = r.value.runtime;
+                item.directors = r.value.directors;
+                item.actors = r.value.actors;
+                item.genres = r.value.genres;
+                item.premiereDate = r.value.premiereDate;
+            }
+        });
+        filmDetailCache.flush();
+
+        const rows = uniqueItems.map(i => {
+            const allTitles = [...new Set([i.originalTitle, ...(i.alternativeTitles || []), i.title].filter(Boolean))];
+            const cyrTitles = allTitles.filter(t => isRussianCyrillic(t));
+            const latTitles = allTitles.filter(t => !hasCyr(t));
+            const titleRu = cyrTitles[0] || '';
+            const titleOrig = latTitles[0] || i.slug;
+            return {
+                titleRu,
+                titleOrig,
+                allTitles,
+                type: 'Film',
+                lbSlug: i.slug || '',
+                yearStart: i.year || '',
+                rating: i.rating ?? null,
+                watchedDate: i.watchedDate ?? '',
+                runtime: i.runtime || '',
+                directors: i.directors || '',
+                actors: i.actors || '',
+                premiereDate: i.premiereDate || '',
+                favorite: likedSlugs.has(i.slug),
+                src: 'lb',
+            };
+        });
+        setStatus(statusEl, t('foundCount', { count: rows.length }) + dots());
         return buildCSV(rows);
     }
 
     // Letterboxd film lookup: multiple strategies with progressive fallback
-    async function lbSearchFilm(title, year, csrfRef) {
-        const cacheKey = `lb:${normTitle(title)}|${year || ''}`;
+    async function lbSearchFilm(title, year, csrfRef, deep = false, allTitles = [], src = {}) {
+        const cacheKey = `lb:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}`;
         return dedupeFetch(cacheKey, async () => {
-            const nT = normTitle(title);
-            const yearStr = String(year || '').trim();
-            const yearNum = yearStr ? parseInt(yearStr, 10) : null;
+            const variants = deep ? getTitleVariants(title, allTitles) : getTitleVariants(title, allTitles).slice(0, 5);
             const ts = Date.now();
+            let best = null;
 
-            // Helper: extract slug from autocomplete entry (url="/film/the-matrix/" or "/tv/breaking-bad/")
             const slugFromUrl = u => u?.replace(/^\/(?:film|tv)\/|\/$/g, '') || null;
 
-            // Helper: try autocomplete with a query
-            const tryAutocomplete = async (q, csrfRef) => {
+            const tryAutocomplete = async (q) => {
+                const results = [];
+                const endpoints = [
+                    { url: `https://letterboxd.com/s/autocompletefilm?q=${encodeURIComponent(q)}&limit=20&timestamp=${ts}`, type: 'Film' },
+                    { url: `https://letterboxd.com/s/autocompletetv?q=${encodeURIComponent(q)}&limit=20&timestamp=${ts}`, type: 'TvSeries' },
+                ];
                 for (let attempt = 0; attempt < 3; attempt++) {
-                    const r = await fetchT(`https://letterboxd.com/s/autocompletefilm?q=${encodeURIComponent(q)}&limit=20&timestamp=${ts}`);
-                    if (r?.status === 429) { await sleep(2000 + attempt * 2000); continue; }
-                    if (!r?.ok) return null;
-                    const json = await r.json().catch(() => null);
-                    if (json?.result !== true) return null;
-                    if (csrfRef && json.csrf) csrfRef.val = json.csrf;
-                    const items = json.data ?? [];
-                    if (!items.length) return null;
-
-                    for (const entry of items) {
-                        const slug = slugFromUrl(entry.url);
-                        if (!slug) continue;
-                        const fYear = String(entry.releaseYear ?? '');
-                        const fN = normTitle(entry.name ?? '');
-                        const titleMatch = nT === fN || nT.includes(fN) || fN.includes(nT);
-                        const yearMatch = !yearNum || !fYear || Math.abs(parseInt(fYear, 10) - yearNum) <= 1;
-                        if (titleMatch && yearMatch) return { slug, filmId: entry.id ? String(entry.id) : null, lid: entry.lid ?? null, year: fYear };
+                    const responses = await Promise.all(endpoints.map(ep => fetchT(ep.url).catch(() => null)));
+                    if (responses.some(r => r?.status === 429)) { await sleep(400 + attempt * 600); continue; }
+                    for (let ei = 0; ei < endpoints.length; ei++) {
+                        const r = responses[ei];
+                        if (!r?.ok) continue;
+                        const json = await r.json().catch(() => null);
+                        if (json?.result !== true) continue;
+                        if (csrfRef && json.csrf) csrfRef.val = json.csrf;
+                        for (let ri = 0; ri < (json.data ?? []).length; ri++) {
+                            const entry = json.data[ri];
+                            const entrySlug = slugFromUrl(entry.url);
+                            if (!entrySlug) continue;
+                            const isTv = entry.url?.startsWith('/tv/');
+                            const entryType = isTv ? 'TvSeries' : endpoints[ei].type;
+                            const slugWithPrefix = isTv ? 'tv:' + entrySlug : entrySlug;
+                            results.push({
+                                slug: slugWithPrefix,
+                                filmId: entry.id ? String(entry.id) : null,
+                                lid: entry.lid ?? null,
+                                title: entry.name ?? '',
+                                year: String(entry.releaseYear ?? ''),
+                                type: entryType,
+                                suggestRank: ri,
+                            });
+                        }
                     }
-                    if (!yearNum) {
-                        const first = items[0];
-                        const slug = slugFromUrl(first.url);
-                        if (slug) return { slug, filmId: first.id ? String(first.id) : null, lid: first.lid ?? null, year: String(first.releaseYear ?? '') };
-                    }
-                    return null;
+                    return results;
                 }
-                return null;
+                return results;
             };
 
-            // Strategy 1: Autocomplete with original title + transliteration
-            let result = await tryAutocomplete(title, csrfRef);
-            if (result) return result;
-            if (hasCyr(title)) {
-                result = await tryAutocomplete(translit(title), csrfRef);
-                if (result) return result;
-            }
-
-            // Strategy 2: Alternative title formats
-            const altTitles = [
-                title.replace(/^The\s+/i, '').replace(/^A\s+/i, ''),
-                title.replace(/[\(\[].*?[\)\]]/g, '').trim(),
-                title.replace(/[^a-zа-яё0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim(),
-                // Normalize special chars: ²→2, etc.
-                title.replace(/²/g, '2').replace(/³/g, '3'),
-                // Remove episode/part numbers: "Star Wars: Episode VIII - The Last Jedi" → "Star Wars: The Last Jedi"
-                title.replace(/[\-–—]?\s*(?:Episode|Part|Season|Сезон|Серия)\s+[IVXLCDM\d]+/gi, '').replace(/[\-–—]?\s*(?:Part|Season|Сезон)\s+\d+/gi, '').trim(),
-                // Extract core title from franchise: "Star Wars: The Last Jedi" → "The Last Jedi"
-                (m => m ? m[1].trim() : null)(title.match(/^(?:Star Wars|Harry Potter|Fast and Furious|Mission: Impossible)[\-–—]\s*(.+?)$/i)),
-            ].filter(Boolean);
-            for (const q of [...new Set(altTitles)]) {
-                if (q === title || !q || q.length < 2) continue;
-                result = await tryAutocomplete(q, csrfRef);
-                if (result) return result;
-            }
-
-            // Strategy 3: REMOVED — unreliable for TV shows (/film/ vs /tv/), wastes HEAD requests
-
-            // Strategy 4: HTML search fallback (includes TV shows)
-            const tryHtmlSearch = async (q) => {
-                try {
-                    const html = await fetchLBHtml(`https://letterboxd.com/search/films/?q=${encodeURIComponent(q)}`);
-                    if (!html) return null;
-                    // Try new React-based format: data-item-slug + data-postered-identifier
-                    const itemMatch = html.match(/data-item-slug="([^"]+)"[\s\S]*?data-postered-identifier='(\{[^']+\})'/);
-                    if (itemMatch) {
-                        let filmId = null, lid = null;
-                        try { const d = JSON.parse(itemMatch[2]); filmId = d?.uid?.replace('film:', '') ?? null; lid = d?.lid ?? null; } catch { }
-                        const nameMatch = html.match(/data-item-name="[^"]*\((\d{4})\)/);
-                        return { slug: itemMatch[1], filmId, lid, year: nameMatch?.[1] ?? '' };
+            for (const q of variants) {
+                const items = await tryAutocomplete(q);
+                for (const cand of items) {
+                    const score = scoreCandidate({ title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                    const conf = confidenceLabel(score);
+                    if (conf === 'high') {
+                        DEBUG && console.log(`[mrs] LB autocomplete HIGH: "${title}" (${year}) → ${cand.slug} score=${score.toFixed(2)}`);
+                        if (!year || !cand.year || yearsMatch(cand.year, year)) {
+                            return { ...cand, score, confidence: conf };
+                        }
                     }
-                    return null;
-                } catch { return null; }
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                }
+            }
+
+            const tryHtmlSearch = async (q) => {
+                const results = [];
+                try {
+                    const [filmHtml, tvHtml] = await Promise.all([
+                        fetchLBHtml(`https://letterboxd.com/search/films/?q=${encodeURIComponent(q)}`).catch(() => null),
+                        fetchLBHtml(`https://letterboxd.com/search/tv/?q=${encodeURIComponent(q)}`).catch(() => null),
+                    ]);
+                    const parseSearchHtml = (html, itemType) => {
+                        if (!html) return [];
+                        const items = [];
+                        const slugMatches = [...html.matchAll(/data-item-slug="([^"]+)"/g)];
+                        const nameMatches = [...html.matchAll(/data-item-name="([^"]+)"/g)];
+                        const jsonMatches = [...html.matchAll(/data-postered-identifier='(\{[^']+\})'/g)];
+                        for (let i = 0; i < slugMatches.length; i++) {
+                            const rawSlug = slugMatches[i][1];
+                            const fullName = nameMatches[i]?.[1] ?? '';
+                            const yr = fullName.match(/\((\d{4})\)/)?.[1] ?? '';
+                            const filmName = fullName.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+                            let filmId = null, lid = null;
+                            if (jsonMatches[i]) {
+                                try { const d = JSON.parse(jsonMatches[i][1]); filmId = d?.uid?.replace('film:', '') ?? null; lid = d?.lid ?? null; } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
+                            }
+                            const entrySlug = itemType === 'TvSeries' ? 'tv:' + rawSlug : rawSlug;
+                            items.push({ slug: entrySlug, filmId, lid, title: filmName, year: yr, type: itemType });
+                        }
+                        return items;
+                    };
+                    results.push(...parseSearchHtml(filmHtml, 'Film'));
+                    results.push(...parseSearchHtml(tvHtml, 'TvSeries'));
+                } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
+                return results;
             };
 
-            result = await tryHtmlSearch(title);
-            if (result) return result;
-            if (hasCyr(title)) {
-                result = await tryHtmlSearch(translit(title));
-                if (result) return result;
+            for (const q of variants) {
+                const items = await tryHtmlSearch(q);
+                for (const cand of items) {
+                    const score = scoreCandidate({ title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                    const conf = confidenceLabel(score);
+                    if (conf === 'high') {
+                        DEBUG && console.log(`[mrs] LB HTML HIGH: "${title}" (${year}) → ${cand.slug} score=${score.toFixed(2)}`);
+                        if (!year || !cand.year || yearsMatch(cand.year, year)) {
+                            return { ...cand, score, confidence: conf };
+                        }
+                    }
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                }
             }
 
-            // Strategy 5: Try normalized/core title variants via HTML search
-            for (const q of altTitles) {
-                if (q === title || !q || q.length < 2) continue;
-                result = await tryHtmlSearch(q);
-                if (result) return result;
+            if (best) {
+                DEBUG && console.log(`[mrs] LB best: "${title}" (${year}) → ${best.slug} score=${best.score.toFixed(2)} conf=${best.confidence}`);
+                const yearOk = !best.year || !year || yearsMatch(best.year, year);
+                if (deep && best.confidence !== 'low' && yearOk) return best;
+                if (!deep && yearOk && (best.confidence === 'high' || best.confidence === 'medium' || (best.confidence === 'low' && best.score >= 350))) return best;
             }
-
+            console.warn(`[mrs] LB search FAILED: "${title}" (${year})`);
             return null;
         });
     }
 
     // Get film's LID (Letterboxd ID like "2a1m") needed for the API v0 rate endpoint
     async function lbGetFilmLid(slug, csrfRef) {
-        for (const path of [`/film/${slug}/`, `/tv/${slug}/`]) {
+        // Strip tv: prefix if present — it was added by lbSearchFilm to distinguish TV series
+        const isTv = slug.startsWith('tv:');
+        const cleanSlug = isTv ? slug.slice(3) : slug;
+        const paths = isTv ? [`/tv/${cleanSlug}/`] : [`/film/${cleanSlug}/`, `/tv/${cleanSlug}/`];
+        for (const path of paths) {
             try {
                 const html = await fetchLBHtml(`https://letterboxd.com${path}`);
                 if (!html) continue;
@@ -1522,23 +3532,24 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                 // Extract from data-postered-identifier JSON (React format)
                 const jsonId = html.match(/data-postered-identifier='(\{[^']+\})'/);
                 if (jsonId) {
-                    try { const d = JSON.parse(jsonId[1]); if (d?.lid) return d.lid; } catch { }
+                    try { const d = JSON.parse(jsonId[1]); if (d?.lid) return d.lid; } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
                 }
             } catch { continue; }
         }
         return null;
     }
 
+    let _lbApplyOkCount = 0;  // counter for successful LB apply operations
+
     // Apply rating or mark as watched via Letterboxd internal API v0.
     // csrfRef: { val: string } — mutable ref, updated from each response
-    // Returns { status: 'rated'|t('watched')|null }
+    // Returns { status: 'rated'|'watched'|null }
     async function applyLBRating(slug, lid, filmId, rating10, csrfRef, watchedDate) {
         const hasR = rating10 != null && String(rating10) !== '' && +rating10 >= 1 && +rating10 <= 10;
 
         if (!hasR && !filmId) {
-            // Need filmId for watch endpoint; try to get LID at minimum
-            if (!lid) lid = await lbGetFilmLid(slug, csrfRef);
-            if (!lid) return { status: null };
+            // Need filmId for watch endpoint
+            return { status: null };
         }
 
         if (!csrfRef.val) {
@@ -1580,10 +3591,10 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
             if (r) {
                 const respText = await r.clone().text().catch(() => '');
                 if (r.ok) {
-                    const status = hasR ? 'rated' : t('watched');
-                    applyLBRating._okCount = (applyLBRating._okCount || 0) + 1;
-                    if (applyLBRating._okCount <= 5 || applyLBRating._okCount % 50 === 0) {
-                        console.log(`[mrs] LB ${status.toUpperCase()} OK #${applyLBRating._okCount}: ${slug} filmId=${filmId} lid=${lid} rating=${hasR ? Math.min(5, Math.max(0.5, Math.round(+rating10) / 2)) : 'none'} (csv=${rating10}) status=${r.status} resp=${respText.slice(0, 200)}`);
+                    const status = hasR ? 'rated' : 'watched';
+                    _lbApplyOkCount++;
+                    if (_lbApplyOkCount <= 5 || _lbApplyOkCount % 50 === 0) {
+                        DEBUG && console.log(`[mrs] LB ${status.toUpperCase()} OK #${_lbApplyOkCount}: ${slug} filmId=${filmId} lid=${lid} rating=${hasR ? Math.min(5, Math.max(0.5, Math.round(+rating10) / 2)) : 'none'} (csv=${rating10}) status=${r.status} resp=${respText.slice(0, 200)}`);
                     }
                     return { status };
                 }
@@ -1591,6 +3602,11 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
                     const waitMs = 3000 + attempt * 3000;
                     console.warn(`[mrs] LB 429: ${slug} — retry in ${waitMs}ms (attempt ${attempt + 1}/3)`);
                     await sleep(waitMs);
+                    continue;
+                }
+                if (r.status >= 500 && r.status < 600 && attempt < 2) {
+                    console.warn(`[mrs] LB ${r.status}: ${slug} — retry (attempt ${attempt + 1}/3)`);
+                    await sleep(500 + attempt * 500);
                     continue;
                 }
                 console.warn(`[mrs] LB FAILED: ${slug} filmId=${filmId} lid=${lid} rating=${hasR ? rating10 : 'none'} status=${r.status} body=${respText.slice(0, 300)}`);
@@ -1602,7 +3618,55 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         return { status: null };
     }
 
-    async function performLBImport(csvData, statusEl, mode) {
+    async function applyLBFavorite(filmId, csrfRef) {
+        if (!filmId) return { status: null };
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const csrf = csrfRef?.val || getLBCsrf();
+                if (!csrf) return { status: null };
+                const r = await fetchT(`https://letterboxd.com/s/film:${filmId}/like/`, 15000, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': csrf,
+                    },
+                    body: `liked=true&__csrf=${encodeURIComponent(csrf)}`,
+                });
+                if (r?.status === 429) { await sleep(500 + attempt * 600); continue; }
+                if (r?.ok) {
+                    DEBUG && console.log(`[mrs] LB favorite OK: filmId=${filmId}`);
+                    return { status: 'favorited' };
+                }
+                console.warn(`[mrs] LB favorite failed: filmId=${filmId} status=${r?.status}`);
+            } catch (e) {
+                console.warn(`[mrs] LB favorite exception: filmId=${filmId}`, e.message);
+            }
+            await sleep(1000);
+        }
+        return { status: null };
+    }
+
+    async function lbFetchRatings(statusEl) {
+        const username = getLBUsername();
+        if (!username) {
+            setStatus(statusEl, t('lbUsernameNotFound'));
+            return new Map();
+        }
+        const map = new Map();
+        const rated = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, t('ratings'), statusEl, 200);
+        for (const item of rated) {
+            if (item.slug) map.set(item.slug, item.rating ?? 'watched');
+        }
+        const watched = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, t('watchHistory'), statusEl, 200);
+        for (const item of watched) {
+            if (item.slug && !map.has(item.slug)) map.set(item.slug, 'watched');
+        }
+        return map;
+    }
+
+    async function performLBImport(csvData, statusEl, mode, deep = false, opts = {}) {
+        const t0 = Date.now();
         const items = parseCSV(csvData);
         if (!items.length) return setStatus(statusEl, t('csvEmpty'));
 
@@ -1610,36 +3674,83 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         if (!csrfRef.val) return setStatus(statusEl, t('csrfNotFound'));
 
         // Phase 1: resolve slugs
-        Object.assign(lbProbe, makeProbe(100));
-        setStatus(statusEl, t('resolveIdCount', {count: items.length}));
+        Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
+        setStatus(statusEl, t('resolveIdCount', { count: items.length }) + dots());
         const resolved = [];
         let cur = 0;
 
         while (cur < items.length) {
             const slice = items.slice(cur, cur + lbProbe.c);
-            setStatus(statusEl, t('resolveProgress', {from: cur + 1, to: Math.min(cur + lbProbe.c, items.length), total: items.length}));
+            setStatus(statusEl, t('resolveProgress', { from: cur + 1, to: Math.min(cur + lbProbe.c, items.length), total: items.length }) + dots(), { current: Math.min(cur + lbProbe.c, items.length), total: items.length });
             const t0 = Date.now();
-            const res = await asyncPool(15, slice, i =>
-                i.lbSlug && /^[a-z0-9-]+$/i.test(i.lbSlug)
-                    ? Promise.resolve({ slug: i.lbSlug, filmId: null, lid: null })
-                    : lbSearchFilm(i.title, i.year, csrfRef)
-            );
+            const res = await asyncPool(lbProbe.c, slice, i => {
+                // Direct slug match (valid URL slug or film: ID)
+                if (i.lbSlug && !deep) {
+                    // Handle film:ID format (resolved later) and tv:slug format (used directly)
+            const filmIdMatch = i.lbSlug.match(/^film:(\d+)$/);
+            const tvSlugMatch = i.lbSlug.match(/^tv:(.+)$/);
+                    if (filmIdMatch) {
+                        // Internal LB film ID - use filmId directly, fetch slug later
+                        const filmId = filmIdMatch[1];
+                        return Promise.resolve({ slug: null, filmId, lid: null, score: 1.0, confidence: 'high' });
+                    }
+                    if (tvSlugMatch) {
+                        // TV series slug from LB export — use directly
+                        return Promise.resolve({ slug: i.lbSlug, filmId: null, lid: null, score: 1.0, confidence: 'high' });
+                    }
+                    if (/^[a-z0-9-]+$/i.test(i.lbSlug)) {
+                        return Promise.resolve({ slug: i.lbSlug, filmId: null, lid: null, score: 1.0, confidence: 'high' });
+                    }
+                }
+                return lbSearchFilm(i.title, i.year, csrfRef, deep, i.allTitles, i);
+            });
             let fail = false;
             res.forEach((r, j) => {
                 const found = r.status === 'fulfilled' ? r.value : null;
-                resolved.push({ item: slice[j], slug: found?.slug ?? null, filmId: found?.filmId ?? null, lid: found?.lid ?? null });
-                if (!found) fail = true;
+                if (!found || found.confidence === 'low' || (!deep && found.confidence === 'low')) {
+                    resolved.push({ item: slice[j], slug: null, filmId: null, lid: null });
+                    fail = true;
+                } else {
+                    resolved.push({ item: slice[j], slug: found.slug, filmId: found.filmId, lid: found.lid });
+                }
             });
             cur += lbProbe.c;
             const elapsed = Date.now() - t0;
             fail ? probeFail(lbProbe) : probeOk(lbProbe, elapsed);
-            if (cur < items.length) await sleep(200);
+            // No artificial sleep between resolve batches
+        }
+
+        // Resolve film: IDs to slugs before applying
+        const needSlug = resolved.filter(x => !x.slug && x.filmId);
+        if (needSlug.length) {
+            setStatus(statusEl, `Resolving film slugs for ${needSlug.length} films...` + dots());
+            const slugs = await asyncPool(5, needSlug, async x => {
+                try {
+                    // Fetch film page by ID to get the slug
+                    const r = await fetchT(`https://letterboxd.com/film/${x.filmId}/`, 12000);
+                    if (!r?.ok) return null;
+                    const html = await r.text();
+                    // Method 1: canonical link tag (flexible quote matching)
+                    let slugMatch = html.match(/<link\s+rel=["']?canonical["']?\s+href=["']https?:\/\/letterboxd\.com\/(?:film|tv)\/([^\/"'?#]+)/i);
+                    if (slugMatch) return slugMatch[1];
+                    // Method 2: og:url meta tag
+                    slugMatch = html.match(/<meta\s+property=["']og:url["']\s+content=["']https?:\/\/letterboxd\.com\/(?:film|tv)\/([^\/"'?#]+)/i);
+                    if (slugMatch) return slugMatch[1];
+                    // Method 3: extract slug from <title> or heading
+                    slugMatch = html.match(/data-film-slug=["']([^"']+)["']/);
+                    if (slugMatch) return slugMatch[1];
+                } catch (e) { /* ignore */ }
+                return null;
+            });
+            slugs.forEach((r, i) => {
+                if (r.status === 'fulfilled' && r.value) needSlug[i].slug = r.value;
+            });
         }
 
         // Pre-fetch missing LIDs in parallel before apply phase
         const needLid = resolved.filter(x => x.slug && !x.lid);
         if (needLid.length) {
-            setStatus(statusEl, t('fetchingLid', {count: needLid.length}));
+            setStatus(statusEl, t('fetchingLid', { count: needLid.length }) + dots());
             const lids = await asyncPool(10, needLid, x => lbGetFilmLid(x.slug, csrfRef));
             lids.forEach((r, i) => {
                 if (r.status === 'fulfilled' && r.value) needLid[i].lid = r.value;
@@ -1647,38 +3758,80 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
         }
 
         // Phase 2: apply
-        Object.assign(lbProbe, makeProbe(100));
-        let rated = 0, watched = 0, notFound = 0, failed = 0;
+        Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
+        setStatus(statusEl, mode === 'normal' && !deep ? t('checkingExisting') : t('startingImport') + dots());
+        const existing = mode === 'normal' && !deep ? await lbFetchRatings(statusEl) : new Map();
+        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0, favCount = 0;
         const missed = [];
         const toApply = resolved.filter(x => {
-            if (!x.slug) { notFound++; missed.push(x.item); return false; }
+            if (!x.slug) {
+                notFound++; missed.push({ ...x.item, error: t('errorNotFoundLB') }); return false;
+            }
+            const hasR = x.item.rating != null && String(x.item.rating) !== '' && +x.item.rating >= 1 && +x.item.rating <= 10;
+            const ex = existing.get(x.slug);
+            if (mode === 'normal' && ex != null && (ex !== 'watched' || !hasR)) { skipped++; return false; }
             return true;
         });
-        console.log(`[mrs] LB PHASE SUMMARY: CSV parsed=${items.length} resolved=${resolved.length} withSlug=${toApply.length} noSlug=${notFound}`);
+        DEBUG && console.log(`[mrs] LB PHASE SUMMARY: CSV parsed=${items.length} resolved=${resolved.length} withSlug=${toApply.length} noSlug=${notFound} skipped=${skipped}`);
 
         cur = 0;
+        let favorites = 0;
         while (cur < toApply.length) {
-            const slice = toApply.slice(cur, cur + 15);
-            setStatus(statusEl, t('applyProgress', {from: cur + 1, to: Math.min(cur + 15, toApply.length), total: toApply.length}));
-            const res = await asyncPool(15, slice, entry => applyLBRating(entry.slug, entry.lid, entry.filmId, entry.item.rating, csrfRef, entry.item.watchedDate));
+            const slice = toApply.slice(cur, cur + lbProbe.c);
+            setStatus(statusEl, t('applyProgress', { from: cur + 1, to: Math.min(cur + lbProbe.c, toApply.length), total: toApply.length }) + dots(), { current: Math.min(cur + lbProbe.c, toApply.length), total: toApply.length });
+            const res = await asyncPool(lbProbe.c, slice, entry => applyLBRating(entry.slug, entry.lid, entry.filmId, entry.item.rating, csrfRef, entry.item.watchedDate));
             res.forEach((r, j) => {
                 const st = r.status === 'fulfilled' ? (r.value?.status ?? null) : null;
                 if (st === 'rated') rated++;
-                else if (st === t('watched')) watched++;
-                else { failed++; missed.push(toApply[cur + j].item); }
+                else if (st === 'watched') watched++;
+                else { failed++; missed.push({ ...toApply[cur + j].item, error: t('errorApi') }); }
             });
-            cur += 15;
-            await sleep(50);
+            cur += lbProbe.c;
+            await sleep(30);
         }
 
-        if (missed.length) downloadCSV(buildCSV(missed), 'lb_missed.csv');
-        console.log(`[mrs] LB APPLY DONE: rated=${rated} watched=${watched} failed=${failed} toApply=${toApply.length}`);
-        renderResult(statusEl, t('done', {mode: lbl}), [
-            [t('rated'), rated],
-            ['Просмотрено: ', watched],
-            [t('notFound'), notFound],
-            [t('failed'), failed],
-        ], !notFound && !failed ? t('allImported') : null);
+        const favItems = opts.importFavorites !== false ? toApply.filter(x => x.item.favorite && x.filmId) : [];
+        if (favItems.length) {
+            setStatus(statusEl, 'Applying favorites...' + dots());
+            for (const entry of favItems) {
+                const r = await applyLBFavorite(entry.filmId, csrfRef);
+                if (r.status === 'favorited') favorites++;
+                await sleep(200);
+            }
+        }
+
+        DEBUG && console.log(`[mrs] LB APPLY DONE: rated=${rated} watched=${watched} favorites=${favorites} failed=${failed} toApply=${toApply.length}`);
+        searchCache.flush();
+        renderLBResult({ rated, watched, skipped, notFound, failed, missed, favorites, elapsedMs: Date.now() - t0 }, statusEl, mode);
+    }
+
+    function renderLBResult(result, statusEl, mode) {
+        const lbl = mode === 'replace' ? t('replaceMode') : '';
+        const lbPairs = [
+            [t('rated'), result.rated],
+            [t('watchedShort'), result.watched],
+            [t('skipped'), result.skipped],
+            [t('notFound'), result.notFound],
+            [t('failed'), result.failed],
+        ];
+        if (result.favorites != null) lbPairs.push([t('favorites'), result.favorites]);
+        renderResult(statusEl, t('done', { mode: lbl }), lbPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
+        if (result.missed.length) {
+            downloadCSV(buildCSV(result.missed), 'lb_missed.csv');
+            const btn = Object.assign(document.createElement('button'), {
+                id: 'mrs-retry-lb',
+                className: 'mrs-btn mrs-btn--secondary',
+                textContent: t('deepSearchBtn', { count: result.missed.length }),
+            });
+            btn.addEventListener('click', async () => {
+                setStatus(statusEl, t('deepSearch', { platform: 'Letterboxd' }) + dots());
+                await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions());
+            });
+            const btnWrap = document.createElement('div');
+            btnWrap.style.padding = '0 18px 14px';
+            btnWrap.appendChild(btn);
+            statusEl.appendChild(btnWrap);
+        }
     }
 
     // ====================== MODULE REGISTRY ======================
@@ -1686,106 +3839,367 @@ const TRANSLATIONS = {en: {time: 'Time',exportRatings: '📤 Export Ratings',imp
     const MODULES = {
         kp: {
             isActive: () => SITE.isKP,
-            export: performKPExport,
-            import: performKPImport,
+            'export': performKPExport,
+            'import': performKPImport,
             exportFileName: () => `kinopoisk_ratings_${new Date().toISOString().slice(0, 10)}.csv`,
         },
         imdb: {
             isActive: () => SITE.isIMDb,
-            export: performIMDbExport,
-            import: performIMDbImport,
+            'export': performIMDbExport,
+            'import': performIMDbImport,
             exportFileName: () => `imdb_ratings_${new Date().toISOString().slice(0, 10)}.csv`,
         },
         lb: {
             isActive: () => SITE.isLB,
-            export: performLBExport,
-            import: performLBImport,
+            'export': performLBExport,
+            'import': performLBImport,
             exportFileName: () => `letterboxd_ratings_${new Date().toISOString().slice(0, 10)}.csv`,
         },
     };
 
     // ====================== UI ======================
 
-    const __mrsStyle = document.createElement('style');
-    __mrsStyle.textContent = `
-        #mrs-wrap{position:fixed;bottom:20px;right:20px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-        #mrs-status{background:rgba(0,0,0,.93);color:#fff;padding:12px 16px;border-radius:8px;max-width:420px;display:none;font-size:13.5px;line-height:1.5;word-break:break-word}
-        .mrs-btn{padding:12px 20px;font-weight:700;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4);font-size:14px;transition:opacity .15s}
-        .mrs-btn:disabled{opacity:.5;cursor:default}
-        .mrs-btn--yellow{background:#f5c518;color:#000}
-        .mrs-btn--red{background:#e60000;color:#fff}
-        #mrs-btn-group{display:flex;flex-direction:column;gap:8px}
-    `;
-    (document.head || document.documentElement).appendChild(__mrsStyle);
+    // GM_addStyle fallback — some managers don't define it, which would crash the entire script
+    const __mrsAddStyle = typeof GM_addStyle === 'function'
+        ? GM_addStyle
+        : (css) => {
+            const s = document.createElement('style');
+            s.textContent = css;
+            (document.head || document.documentElement).appendChild(s);
+        };
+    __mrsAddStyle(`
+        #mrs-wrap{position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+        #mrs-panel{background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
+        #mrs-panel.mrs--visible{transform:scale(1) translateY(0);opacity:1;pointer-events:auto}
+        .mrs-btn{padding:10px 16px;font-weight:600;border:none;border-radius:0;cursor:pointer;font-size:13px;letter-spacing:-.01em;transition:all .2s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;gap:8px;background:#fff;color:#333}
+        .mrs-btn:hover{background:#f5f5f5}
+        .mrs-btn:first-child{border-radius:13px 13px 0 0}
+        .mrs-btn:last-of-type{border-radius:0 0 13px 13px}
+        .mrs-btn--primary{background:#111;color:#fff}
+        .mrs-btn--primary:hover{background:#222}
+        .mrs-btn--secondary{background:#f3f4f6;color:#111}
+        .mrs-btn--secondary:hover{background:#e5e7eb}
+        .mrs-btn--danger{color:#e11d48;background:#fff}
+        .mrs-btn--danger:hover{background:#fee2e2}
+        .mrs-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+        #mrs-status{background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(0,0,0,0.06);border-radius:18px;max-width:380px;min-width:260px;display:none;font-size:13px;line-height:1.6;word-break:break-word;box-shadow:0 16px 48px rgba(0,0,0,0.12);padding:0;overflow:hidden;animation:mrs-fade-in .3s ease}
+        @keyframes mrs-fade-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        .mrs-status__header{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.04);font-weight:600;color:#111;display:flex;align-items:flex-start;gap:10px}
+        .mrs-status__title{color:#111;font-weight:600;text-shadow:0 0 6px rgba(255,255,255,0.9),0 0 2px rgba(255,255,255,1);flex:1 1 auto;min-width:0;word-wrap:break-word}
+        .mrs-status__timer{margin-left:auto;color:#888;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:2px}
+        .mrs-status__header--result{align-items:center;gap:8px;border-bottom:none}
+        .mrs-status__progress{height:3px;background:rgba(0,0,0,0.04);border-radius:0 0 18px 18px;overflow:hidden}
+        .mrs-status__progress-bar{height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:0 2px 2px 0;transition:width .3s ease;width:0%}
+        .mrs-pulse{width:8px;height:8px;border-radius:50%;background:#3b82f6;animation:mrs-pulse 1.5s ease-in-out infinite;flex-shrink:0}
+        @keyframes mrs-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+        .mrs-result-pairs{color:#444;font-size:12px;display:flex;flex-direction:column;gap:2px;flex:0 1 auto;min-width:0}
+        .mrs-result-pair{display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+        .mrs-result-label{color:#888;font-size:12px}
+        .mrs-result-value{font-weight:600;color:#111;font-size:12px}
+        .mrs-opts{display:flex;flex-direction:column;gap:6px;padding:10px 12px 8px;border-top:1px solid rgba(0,0,0,0.1)}
+        .mrs-opts__row{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#555;transition:color .15s}
+        .mrs-opts__row:hover{color:#111}
+        .mrs-opts__row input{margin:0;width:14px;height:14px;accent-color:#3b82f6;cursor:pointer}
+        .mrs-lang-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid rgba(0,0,0,0.1);font-size:12px;color:#555}
+        .mrs-lang-row label{font-weight:600;color:#333;white-space:nowrap}
+        .mrs-lang-select{flex:1;padding:4px 8px;border:1px solid rgba(0,0,0,0.1);border-radius:8px;font-size:12px;background:#fff;color:#333;cursor:pointer;outline:none;transition:border-color .15s}
+        .mrs-lang-select:hover{border-color:rgba(59,130,246,0.5)}
+        .mrs-lang-select:focus{border-color:#3b82f6}
+    `);
 
+    let _mrsBuilding = false;
     function buildUI() {
+        DEBUG && console.log("[mrs] buildUI called");
         if (document.getElementById('mrs-wrap')) return;
+        if (_mrsBuilding) { console.warn('[mrs] buildUI already in progress, skipping'); return; }
         const mod = Object.values(MODULES).find(m => m.isActive());
         if (!mod) return;
+        if (!document.body) { console.warn('[mrs] document.body not ready, deferring buildUI'); return false; }
+        _mrsBuilding = true;
+        try {
+            const frag = document.createDocumentFragment();
+            const wrap = document.createElement('div');
+            wrap.id = 'mrs-wrap';
 
-        const wrap = document.createElement('div');
-        wrap.id = 'mrs-wrap';
+            const statusEl = document.createElement('div');
+            statusEl.id = 'mrs-status';
+            wrap.appendChild(statusEl);
 
-        const statusEl = document.createElement('div');
-        statusEl.id = 'mrs-status';
-        wrap.appendChild(statusEl);
+            const fileInput = Object.assign(document.createElement('input'), { type: 'file', accept: '.csv' });
+            fileInput.style.display = 'none';
+            wrap.appendChild(fileInput);
 
-        const fileInput = Object.assign(document.createElement('input'), { type: 'file', accept: '.csv' });
-        fileInput.style.display = 'none';
-        document.body.appendChild(fileInput);
+            // --- Import options checkboxes ---
+            const opts = getImportOptions();
+            const cbFav = Object.assign(document.createElement('input'), { type: 'checkbox', checked: opts.importFavorites });
+            cbFav.addEventListener('change', () => { opts.importFavorites = cbFav.checked; saveImportOptions(opts); });
 
-        let mode = 'normal';
-        const btns = [];
-        const setDisabled = v => btns.forEach(b => b.disabled = v);
+            const labelFav = document.createElement('label');
+            labelFav.className = 'mrs-opts__row';
+            labelFav.title = t('importFavoritesHint');
+            labelFav.appendChild(cbFav);
+            labelFav.appendChild(document.createTextNode(t('importFavorites')));
 
-        const btnExport = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--yellow', textContent: '📤 Экспорт оценок' });
-        btnExport.addEventListener('click', async () => {
-            setDisabled(true);
-            try {
-                const csv = await mod.export(statusEl);
-                if (csv) {
-                    const fname = typeof mod.exportFileName === 'function' ? mod.exportFileName() : mod.exportFileName;
-                    downloadCSV(csv, fname);
-                    setStatus(statusEl, t('exportDone'));
+            const optsDiv = document.createElement('div');
+            optsDiv.className = 'mrs-opts';
+            optsDiv.appendChild(labelFav);
+
+            DEBUG && console.log('[mrs] buildUI: optsDiv created, children=', optsDiv.childNodes.length);
+            // ---
+
+            // --- Language selector ---
+            const langRow = document.createElement('div');
+            langRow.className = 'mrs-lang-row';
+            const langLabel = document.createElement('label');
+            langLabel.textContent = t('language');
+            langLabel.htmlFor = 'mrs-lang-select';
+            const langSelect = document.createElement('select');
+            langSelect.id = 'mrs-lang-select';
+            langSelect.className = 'mrs-lang-select';
+            langSelect.title = t('languageHint');
+            const supportedLangs = [['en', 'English'], ['ru', 'Русский'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['pt', 'Português'], ['zh', '中文'], ['ja', '日本語'], ['ko', '한국어']];
+            for (const [code, name] of supportedLangs) {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = name;
+                if (code === __locale) opt.selected = true;
+                langSelect.appendChild(opt);
+            }
+            langSelect.addEventListener('change', () => {
+                applyLocale(langSelect.value);
+            });
+            langRow.appendChild(langLabel);
+            langRow.appendChild(langSelect);
+            DEBUG && console.log('[mrs] buildUI: langRow created, children=', langRow.childNodes.length);
+            // ---
+            let mode = 'normal';
+            const btns = [];
+            const setDisabled = v => btns.forEach(b => b.disabled = v);
+
+            const btnExport = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--primary', textContent: t('exportRatings'), title: t('exportHint') });
+            btnExport.addEventListener('click', async () => {
+                setDisabled(true);
+                const exportStart = Date.now();
+                try {
+                    const csv = await mod.export(statusEl);
+                    if (csv) {
+                        const fname = typeof mod.exportFileName === 'function' ? mod.exportFileName() : mod.exportFileName;
+                        downloadCSV(csv, fname);
+                        renderResult(statusEl, t('exportDone'), [], null, Date.now() - exportStart);
+                    }
+                } catch (e) {
+                    renderResult(statusEl, '❌ ' + (e.message ?? String(e)), [], null, Date.now() - exportStart);
+                } finally { setDisabled(false); }
+            });
+
+            const btnImport = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--secondary', textContent: t('importRatings'), title: t('importHint') });
+            const btnReplace = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--danger', textContent: t('hardImport'), title: t('hardImportHint') });
+
+            btnImport.addEventListener('click', () => { mode = 'normal'; fileInput.click(); });
+            btnReplace.addEventListener('click', () => { mode = 'replace'; fileInput.click(); });
+
+            fileInput.addEventListener('change', async e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                fileInput.value = '';
+                setDisabled(true);
+                clearStatus(statusEl);
+                statusEl.style.display = 'block';
+                try { await mod.import(await file.text(), statusEl, mode, false, getImportOptions()); }
+                finally { setDisabled(false); }
+            });
+
+            btns.push(btnExport, btnImport, btnReplace);
+            const panel = document.createElement('div');
+            panel.id = 'mrs-panel';
+            panel.appendChild(btnExport);
+            panel.appendChild(btnImport);
+            panel.appendChild(btnReplace);
+            panel.appendChild(optsDiv);
+            panel.appendChild(langRow);
+            DEBUG && console.log('[mrs] buildUI: panel children count after append=', panel.childNodes.length);
+            wrap.appendChild(panel);
+            frag.appendChild(wrap);
+            document.body.appendChild(frag);
+            requestAnimationFrame(() => panel.classList.add('mrs--visible'));
+        } catch (e) {
+            console.error('[mrs] buildUI failed:', e);
+            const partial = document.getElementById('mrs-wrap');
+            if (partial) partial.remove();
+        } finally {
+            _mrsBuilding = false;
+        }
+        // SPA resilience: re-check UI still exists after delays
+        if (buildUI._recheckTimers) buildUI._recheckTimers.forEach(clearTimeout);
+        buildUI._recheckTimers = [];
+        const recheck = (delay) => {
+            const tid = setTimeout(() => {
+                const wrap = document.getElementById('mrs-wrap');
+                const panel = document.getElementById('mrs-panel');
+                const hasOpts = !!panel?.querySelector('.mrs-opts');
+                const hasLang = !!panel?.querySelector('.mrs-lang-row');
+                if ((!wrap || !hasOpts || !hasLang) && document.body) {
+                    DEBUG && console.log('[mrs] UI incomplete or removed by SPA, re-injecting (' + delay + 'ms)');
+                    if (wrap) wrap.remove();
+                    buildUI();
                 }
-            } catch (e) {
-                setStatus(statusEl, '❌ ' + (e.message ?? String(e)));
-            } finally { setDisabled(false); }
-        });
-
-        const btnImport = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--yellow', textContent: '📥 Импортировать' });
-        const btnReplace = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--red', textContent: '🔄 Жёсткий импорт', title: 'Перезапишет существующие оценки' });
-
-        btnImport.addEventListener('click', () => { mode = 'normal'; fileInput.click(); });
-        btnReplace.addEventListener('click', () => { mode = 'replace'; fileInput.click(); });
-
-        fileInput.addEventListener('change', async e => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            fileInput.value = '';
-            setDisabled(true);
-            statusEl.style.display = 'block';
-            try { await mod.import(await file.text(), statusEl, mode); }
-            finally { setDisabled(false); }
-        });
-
-        btns.push(btnExport, btnImport, btnReplace);
-        wrap.appendChild(btnExport);
-        const grp = document.createElement('div');
-        grp.id = 'mrs-btn-group';
-        grp.append(btnImport, btnReplace);
-        wrap.appendChild(grp);
-        document.body.appendChild(wrap);
+            }, delay);
+            buildUI._recheckTimers.push(tid);
+        };
+        recheck(100); recheck(500); recheck(2000);
     }
 
     // ====================== INIT ======================
 
     if (SITE.isKP || SITE.isIMDb || SITE.isLB) {
-        buildUI();
-        const reinit = () => setTimeout(buildUI, 500);
-        window.addEventListener('popstate', reinit);
-        const _push = history.pushState.bind(history);
-        history.pushState = (...a) => { _push(...a); reinit(); };
+        // MutationObserver: re-inject if SPA removes our UI
+        let _mrsObserver = null;
+        let _mrsReinjectCount = 0;
+        const MAX_REINJECT = 10;
+        const _mrsSetupObserver = () => {
+            if (!document.body) return;
+            if (_mrsObserver) _mrsObserver.disconnect();
+            const obs = new MutationObserver(() => {
+                try {
+                    const wrap = document.getElementById('mrs-wrap');
+                    const panel = document.getElementById('mrs-panel');
+                    const hasOpts = !!panel?.querySelector('.mrs-opts');
+                    const hasLang = !!panel?.querySelector('.mrs-lang-row');
+                    if ((!wrap || !hasOpts || !hasLang) && document.body) {
+                        if (_mrsReinjectCount >= MAX_REINJECT) { obs.disconnect(); return; }
+                        _mrsReinjectCount++;
+                        DEBUG && console.log('[mrs] UI incomplete or removed by SPA, re-injecting');
+                        if (wrap) wrap.remove();
+                        buildUI();
+                    }
+                } catch (e) { console.error('[mrs] Observer error:', e.message); }
+            });
+            _mrsObserver = obs;
+            obs.observe(document.body, { childList: true, subtree: true });
+        };
+        try {
+            // If body isn't ready yet, wait for DOMContentLoaded
+            if (document.body) {
+                buildUI();
+                _mrsSetupObserver();
+            } else {
+                DEBUG && console.log('[mrs] body not ready, waiting for DOMContentLoaded');
+                document.addEventListener('DOMContentLoaded', () => {
+                    buildUI();
+                    _mrsSetupObserver();
+                }, { once: true });
+            }
+            const reinit = () => setTimeout(buildUI, 500);
+            window.addEventListener('popstate', reinit);
+            const _push = history.pushState.bind(history);
+            history.pushState = (...a) => { _push(...a); reinit(); };
+            const _replace = history.replaceState.bind(history);
+            history.replaceState = (...a) => { _replace(...a); reinit(); };
+
+        } catch (e) {
+            console.error('[mrs] Init error:', e.message, e.stack);
+        }
     }
+    // ====================== KP FAVORITE DIAGNOSTIC ======================
+    // Call `mrsDiagnoseKPFavorite()` from the console while on a KP film page,
+    // then click the ♥ heart (favorite) button. The captured GraphQL request
+    // will be logged so we can fix the MovieSetFavorite mutation.
+    window.mrsDiagnoseKPFavorite = function () {
+        const origFetch = window.fetch;
+        const origOpen = XMLHttpRequest.prototype.open;
+        const origSend = XMLHttpRequest.prototype.send;
+
+        function logReq(type, url, body, resp) {
+            DEBUG && console.log(`%c[mrs-diag] === KP FAVORITE DIAGNOSTIC ===`, 'font-size:14px;font-weight:bold;color:#f59e0b');
+            DEBUG && console.log(`%cURL: ${url}`, 'color:#3b82f6');
+            if (body) {
+                try { DEBUG && console.log(`%cREQUEST:`, 'color:#10b981', JSON.parse(body)); }
+                catch { DEBUG && console.log(`%cREQUEST:`, 'color:#10b981', body); }
+            }
+            if (resp) {
+                try { DEBUG && console.log(`%cRESPONSE:`, 'color:#8b5cf6', typeof resp === 'string' ? JSON.parse(resp) : resp); }
+                catch { DEBUG && console.log(`%cRESPONSE:`, 'color:#8b5cf6', resp); }
+            }
+            DEBUG && console.log(`%c====================================`, 'font-size:14px;font-weight:bold;color:#f59e0b');
+        }
+
+        // Intercept XHR
+        XMLHttpRequest.prototype.open = function (method, url, ...args) {
+            this._mrsUrl = url;
+            this._mrsMethod = method;
+            return origOpen.call(this, method, url, ...args);
+        };
+        XMLHttpRequest.prototype.send = function (body) {
+            if (this._mrsUrl && typeof this._mrsUrl === 'string' &&
+                this._mrsUrl.includes('graphql.kinopoisk.ru')) {
+                const url = this._mrsUrl;
+                const b = body;
+                this.addEventListener('load', function () {
+                    logReq('XHR', url, b, this.responseText);
+                });
+                this.addEventListener('error', function () {
+                    console.warn('[mrs-diag] XHR error:', url);
+                });
+            }
+            return origSend.call(this, body);
+        };
+
+        // Intercept fetch
+        window.fetch = function (input, init) {
+            const url = typeof input === 'string' ? input : (input?.url || '');
+            if (typeof url === 'string' && url.includes('graphql.kinopoisk.ru')) {
+                const body = init?.body || '';
+                return origFetch.call(window, input, init).then(function (resp) {
+                    resp.clone().text().then(function (text) {
+                        logReq('fetch', url, body, text);
+                    }).catch(function () { });
+                    return resp;
+                }).catch(function (e) {
+                    console.warn('[mrs-diag] fetch error:', url, e.message);
+                    throw e;
+                });
+            }
+            return origFetch.call(window, input, init);
+        };
+
+        // Add click listener on the page to help detect favorite button clicks
+        document.addEventListener('click', function mrsFavClick(e) {
+            const target = e.target;
+            const isFavBtn = target.closest('[class*="favorite"], [class*="favourite"], [aria-label*="favorite"], [aria-label*="избран"], button[class*="heart"], a[class*="heart"], svg[class*="heart"]');
+            if (isFavBtn) {
+                DEBUG && console.log(`%c[mrs-diag] 🖱️ Favorite button clicked! Check XHR/fetch logs above.`, 'font-size:13px;font-weight:bold;color:#ef4444');
+            }
+        }, true);
+
+        DEBUG && console.log(`%c[mrs-diag] ✅ Diagnostic active!`, 'font-size:16px;font-weight:bold;color:#22c55e');
+        DEBUG && console.log(`%c[mrs-diag] Instructions:`, 'font-weight:bold');
+        DEBUG && console.log(`  1. Navigate to a Kinopoisk film page (e.g., /film/12345/)`);
+        DEBUG && console.log(`  2. Click the ♥ heart (Избранное / Favorite) button`);
+        DEBUG && console.log(`  3. Check the console for the captured GraphQL request ↓`);
+        DEBUG && console.log(`%c[mrs-diag] To disable, call: mrsDisableKPFavorite()`, 'color:#f59e0b');
+
+        return function disable() {
+            XMLHttpRequest.prototype.open = origOpen;
+            XMLHttpRequest.prototype.send = origSend;
+            window.fetch = origFetch;
+            document.removeEventListener('click', mrsFavClick, true);
+            DEBUG && console.log('%c[mrs-diag] ❌ Diagnostic disabled.', 'font-size:13px;font-weight:bold;color:#ef4444');
+        };
+    };
+
+    // Helper to easily disable diagnostic
+    window.mrsDisableKPFavorite = function () {
+        if (window.__mrsDiagDisable) {
+            window.__mrsDiagDisable();
+            window.__mrsDiagDisable = null;
+        }
+    };
+    // Patch window.mrsDiagnoseKPFavorite to store the disable function
+    const _origDiag = window.mrsDiagnoseKPFavorite;
+    window.mrsDiagnoseKPFavorite = function () {
+        if (window.__mrsDiagDisable) window.__mrsDiagDisable();
+        window.__mrsDiagDisable = _origDiag();
+        return window.__mrsDiagDisable;
+    };
 
 })();

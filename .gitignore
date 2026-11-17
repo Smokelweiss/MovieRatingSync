@@ -17,3 +17,9 @@ Thumbs.db
 *.zip
 _*/
 
+# Node / tooling
+node_modules/
+*.log
+
+# Freebuff worktrees (isolated copies of this repo)
+.freebuff/

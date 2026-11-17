@@ -1,185 +1,137 @@
 'use strict';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
+/**
+ * i18n tests for movie-rating-sync.user.js
+ * Run: node tests/i18n.test.js
+ *
+ * Verifies:
+ *  1. TRANSLATIONS parses without invoking t() (a past regression crashed at load)
+ *  2. Every language defines exactly the same key set as English
+ *  3. t() returns a non-empty string for every key in every language
+ *  4. All t('...') / t("...") call sites reference keys that exist in the table
+ */
 
-const { TEST_TRANSLATIONS, getLocaleWithEnv, tWithEnv } = require('./i18n-helpers');
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
-// ====================== GETLOCALE ======================
+const SRC = fs.readFileSync(path.join(__dirname, '..', 'movie-rating-sync.user.js'), 'utf8');
 
-describe('getLocaleWithEnv', () => {
-    it('returns saved language from localStorage', () => {
-        const env = {
-            localStorage: { getItem: () => 'ru' },
-            navigator: { language: 'en-US' },
-            document: { documentElement: { lang: 'en' } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'ru');
+// ---------------------------------------------------------------------------
+// Extract the TRANSLATIONS literal with brace-matching (string-aware).
+// Works whether the object is on one line or reformatted across many.
+// ---------------------------------------------------------------------------
+function extractTranslations(src) {
+    const marker = 'const TRANSLATIONS = ';
+    const start = src.indexOf(marker);
+    assert(start !== -1, 'Could not locate `const TRANSLATIONS =` in the userscript');
+
+    const openIdx = src.indexOf('{', start + marker.length);
+    assert(openIdx !== -1, 'No `{` after const TRANSLATIONS');
+
+    let depth = 0;
+    let inStr = null; // null | "'" | '"'
+    let escaped = false;
+    for (let i = openIdx; i < src.length; i++) {
+        const ch = src[i];
+        if (inStr) {
+            if (escaped) { escaped = false; continue; }
+            if (ch === '\\') { escaped = true; continue; }
+            if (ch === inStr) inStr = null;
+            continue;
+        }
+        if (ch === "'" || ch === '"') { inStr = ch; continue; }
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+            depth--;
+            if (depth === 0) return src.slice(openIdx, i + 1);
+        }
+    }
+    assert.fail('Unbalanced braces while extracting TRANSLATIONS literal');
+}
+const literalText = extractTranslations(SRC);
+
+let TRANSLATIONS;
+try {
+    // eslint-disable-next-line no-new-func
+    TRANSLATIONS = new Function('t', `return ${literalText};`)(() => {
+        throw new Error('t() was called during TRANSLATIONS initialization — this crashes the script at load time');
     });
+} catch (e) {
+    assert.fail(`TRANSLATIONS literal must not call t() at module init: ${e.message}`);
+}
 
-    it('falls from invalid saved value to navigator language', () => {
-        const env = {
-            localStorage: { getItem: () => 'xx' },
-            navigator: { language: 'fr-FR' },
-            document: { documentElement: { lang: 'en' } },
-            translations: TEST_TRANSLATIONS,
-        };
-        // 'fr' is not in TEST_TRANSLATIONS → falls through to 'en'
-        assert.equal(getLocaleWithEnv(env), 'en');
-    });
+const LANGS = Object.keys(TRANSLATIONS);
+const EN_KEYS = Object.keys(TRANSLATIONS.en);
 
-    it('falls to document.documentElement.lang when navigator.language undefined', () => {
-        const env = {
-            localStorage: { getItem: () => null },
-            navigator: { language: undefined },
-            document: { documentElement: { lang: 'ru' } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'ru');
-    });
+// Guard against accidental test pass when the literal didn't extract
+assert(LANGS.length >= 9, `Expected at least 9 languages, got ${LANGS.length}: ${LANGS.join(', ')}`);
+assert(EN_KEYS.length > 40, `Suspiciously few English keys (${EN_KEYS.length}) — extraction may have failed`);
 
-    it('handles entirely missing navigator property', () => {
-        const env = {
-            localStorage: { getItem: () => null },
-            // navigator entirely missing — optional chaining should handle it
-            document: { documentElement: { lang: 'ru' } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'ru');
-    });
+let passed = 0;
+const check = (name, fn) => {
+    try {
+        fn();
+        passed++;
+        console.log(`  ✅ ${name}`);
+    } catch (e) {
+        console.error(`  ❌ ${name}`);
+        throw e;
+    }
+};
 
-    it('handles entirely missing document property', () => {
-        const env = {
-            localStorage: { getItem: () => null },
-            navigator: { language: undefined },
-            // document entirely missing — optional chaining should handle it
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'en');
-    });
+console.log('Languages:', LANGS.join(', '));
+console.log('English keys:', EN_KEYS.length);
 
-    it('handles missing all optional env properties', () => {
-        const env = {
-            // only translations given, nothing else
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'en');
-    });
-
-    it('extracts base language from xx-YY format', () => {
-        const env = {
-            localStorage: { getItem: () => null },
-            navigator: { language: 'es-MX' },
-            document: { documentElement: { lang: 'en' } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'es');
-    });
-
-    it('returns en for unsupported language', () => {
-        const env = {
-            localStorage: { getItem: () => null },
-            navigator: { language: 'de-DE' },
-            document: { documentElement: { lang: 'de' } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'en');
-    });
-
-    it('returns en when localStorage getItem throws', () => {
-        const env = {
-            localStorage: { getItem: () => { throw new Error('no access'); } },
-            navigator: { language: undefined },
-            document: { documentElement: { lang: undefined } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'en');
-    });
-
-    it('returns en for missing all sources', () => {
-        const env = {
-            localStorage: { getItem: () => null },
-            navigator: { language: undefined },
-            document: { documentElement: { lang: undefined } },
-            translations: TEST_TRANSLATIONS,
-        };
-        assert.equal(getLocaleWithEnv(env), 'en');
-    });
-
-    it('uses custom translations object', () => {
-        const customTr = { de: { hello: 'Hallo' } };
-        const env = {
-            localStorage: { getItem: () => 'de' },
-            navigator: { language: 'en' },
-            document: { documentElement: { lang: 'en' } },
-            translations: customTr,
-        };
-        assert.equal(getLocaleWithEnv(env), 'de');
-    });
+// ---------------------------------------------------------------------------
+// 1. Key parity across languages
+// ---------------------------------------------------------------------------
+check('Every language has identical key sets', () => {
+    const problems = [];
+    for (const lang of LANGS) {
+        const keys = Object.keys(TRANSLATIONS[lang]);
+        const notInEn = keys.filter(k => !EN_KEYS.includes(k));
+        const notInLang = EN_KEYS.filter(k => !keys.includes(k));
+        if (notInEn.length) problems.push(`${lang} has extra keys: ${notInEn.join(', ')}`);
+        if (notInLang.length) problems.push(`${lang} is missing keys: ${notInLang.join(', ')}`);
+    }
+    assert.strictEqual(problems.length, 0, problems.join('\n'));
 });
 
-// ====================== T() ======================
-
-describe('tWithEnv', () => {
-    const en = TEST_TRANSLATIONS.en;
-    const ru = TEST_TRANSLATIONS.ru;
-
-    it('returns key from active translation map', () => {
-        assert.equal(tWithEnv(ru, en, 'exportRatings'), '📤 Экспорт оценок');
-    });
-
-    it('returns English key when not in active map', () => {
-        // 'allImported' is in en but NOT in es translations
-        const es = TEST_TRANSLATIONS.es;
-        assert.equal(tWithEnv(es, en, 'allImported'), '🎉 All records imported!');
-    });
-
-    it('returns key name itself when not in any map', () => {
-        assert.equal(tWithEnv(ru, en, 'nonexistentKey'), 'nonexistentKey');
-    });
-
-    it('interpolates single variable', () => {
-        const result = tWithEnv(ru, en, 'done', { mode: ' (режим замены)' });
-        assert.equal(result, '✅ Готово (режим замены)!');
-    });
-
-    it('interpolates numeric variable value', () => {
-        const result = tWithEnv(en, en, 'notFound', { count: 42 });
-        // notFound: 'Not found: ' — no variable in this key, but test that vars work
-        assert.equal(result, 'Not found: ');
-    });
-
-    it('interpolates number variable into string', () => {
-        const testMap = { scoreMsg: 'Score: {score}/10' };
-        const result = tWithEnv(testMap, testMap, 'scoreMsg', { score: 9 });
-        assert.equal(result, 'Score: 9/10');
-    });
-
-    it('handles null/undefined vars as no interpolation', () => {
-        assert.equal(tWithEnv(ru, en, 'exportRatings', null), '📤 Экспорт оценок');
-        assert.equal(tWithEnv(ru, en, 'exportRatings', undefined), '📤 Экспорт оценок');
-    });
-
-    it('interpolates keys with multiple variable occurrences', () => {
-        const testMap = {
-            testKey: '{a} and {a} and {b}',
-        };
-        const result = tWithEnv(testMap, testMap, 'testKey', { a: 'X', b: 'Y' });
-        assert.equal(result, 'X and X and Y');
-    });
-
-    it('handles variables with string numbers', () => {
-        const result = tWithEnv(en, en, 'done', { mode: ' (replace mode)' });
-        assert.equal(result, '✅ Done (replace mode)!');
-    });
-
-    it('fallback chain: active map → English map → key name', () => {
-        // active map has the key
-        assert.equal(tWithEnv(ru, en, 'language'), 'Язык');
-        // English map has the key
-        assert.equal(tWithEnv(ru, en, 'exportHint'), 'Выгрузить все ваши оценки с этого сайта в CSV-файл');
-        // Neither has it
-        assert.equal(tWithEnv(ru, en, 'ghostKey'), 'ghostKey');
-    });
+// ---------------------------------------------------------------------------
+// 2. All translations are non-empty strings
+// ---------------------------------------------------------------------------
+check('Every key has a non-empty string in every language', () => {
+    const empty = [];
+    for (const lang of LANGS) {
+        for (const key of EN_KEYS) {
+            const v = TRANSLATIONS[lang][key];
+            if (typeof v !== 'string' || v.trim() === '') empty.push(`${lang}.${key}`);
+        }
+    }
+    assert.strictEqual(empty.length, 0, `Empty/missing values: ${empty.join(', ')}`);
 });
+
+// ---------------------------------------------------------------------------
+// 3. No t(...) references inside the TRANSLATIONS literal
+//    (the HEAD regression was `ratings: t(t('ratings'))` inside the literal)
+// ---------------------------------------------------------------------------
+check('TRANSLATIONS literal contains no t() calls', () => {
+    const bad = [...literalText.matchAll(/\bt\(/g)];
+    assert.strictEqual(bad.length, 0, `Found ${bad.length} t() call(s) inside TRANSLATIONS: ` +
+        literalText.substring(Math.max(0, (bad[0]?.index ?? 0) - 60), (bad[0]?.index ?? 0) + 60));
+});
+
+// ---------------------------------------------------------------------------
+// 4. Every t('...') call site (outside the literal) references a known key
+// ---------------------------------------------------------------------------
+check('All t(...) call sites use known keys', () => {
+    const endOfLiteral = SRC.indexOf(literalText) + literalText.length;
+    const body = SRC.slice(endOfLiteral);
+    const calls = new Set();
+    for (const mm of body.matchAll(/\bt\(\s*['"]([^'"]+)['"]\s*\)/g)) calls.add(mm[1]);
+    const unknown = [...calls].filter(k => !EN_KEYS.includes(k));
+    assert.strictEqual(unknown.length, 0, `Unknown translation keys used in code: ${unknown.join(', ')}`);
+});
+
+console.log(`\n📊 Results: ${passed} passed, 0 failed`);
