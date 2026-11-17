@@ -52,6 +52,8 @@ function main() {
     const src = fs.readFileSync(SRC, 'utf8');
     const match = src.match(/^\uFEFF?\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==[ \t]*\r?\n/);
     if (!match) throw new Error('userscript header not found in ' + SRC);
+    const version = (match[0].match(/\/\/\s*@version\s+(\S+)/) || [])[1];
+    if (!version) throw new Error('@version not found in userscript header');
     const body = src.slice(match[0].length);
     // Keep one line-ending style in the artifact: match the userscript's own.
     const eol = src.includes('\r\n') ? '\r\n' : '\n';
@@ -59,7 +61,23 @@ function main() {
         + body.trimEnd() + '\n' + GM_SHIM).replace(/\r?\n/g, eol);
     fs.mkdirSync(OUT_DIR, { recursive: true });
     fs.writeFileSync(OUT, out, 'utf8');
+    syncManifestVersions(version);
     console.log('wrote', path.relative(ROOT, OUT), out.length, 'chars');
+}
+
+// Manifests must carry the same version as the userscript, otherwise
+// browsers report a different update version than the script header.
+function syncManifestVersions(version) {
+    for (const name of ['manifest.json', 'manifest.firefox.json']) {
+        const file = path.join(OUT_DIR, name);
+        if (!fs.existsSync(file)) continue;
+        const raw = fs.readFileSync(file, 'utf8');
+        const next = raw.replace(/("version"\s*:\s*")[^"]*(")/, `$1${version}$2`);
+        if (next !== raw) {
+            fs.writeFileSync(file, next, 'utf8');
+            console.log('manifest version ->', version, 'in', name);
+        }
+    }
 }
 
 main();

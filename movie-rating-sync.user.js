@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.1
+// @version      1.2
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -1880,20 +1880,47 @@
         return location.href.match(/\/user\/(ur\d+)/i)?.[1] ?? null;
     }
 
-    async function fetchNextData(url) {
-        try {
-            const r = await fetchT(url);
-            if (!r?.ok) return null;
-            const m = (await r.text()).match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-            return m ? JSON.parse(m[1]) : null;
-        } catch { return null; }
+    // Returns null when the page has no __NEXT_DATA__; throws on transport
+    // failure so scanIMDb can tell "empty page" (stop) from "failed page" (retry).
+    async function fetchNextData(url, timeout = 20000) {
+        const r = await fetchT(url, timeout);
+        // fetchT returns null on transport failure / timeout (it logs the
+        // reason itself). Rethrow so scanIMDb can retry instead of stopping.
+        if (!r) throw new Error(`fetch failed: ${url}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const m = (await r.text()).match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+        return m ? JSON.parse(m[1]) : null;
     }
 
+    // Walk a paginated IMDb listing sequentially. A failed page is retried and,
+    // if it still fails, SKIPPED with a visible warning instead of silently
+    // truncating the whole history (which used to look like a hang).
     async function scanIMDb(uid, urlFn, label, statusEl, set) {
+        let failed = 0;
         for (let p = 1; p <= RETRY.PAGES; p++) {
-            setStatus(statusEl, `${label} ${t('page')} ${p}${dots()}`);
-            const nd = await fetchNextData(urlFn(uid, p));
-            if (!nd) break;
+            setStatus(statusEl, `${label} ${t('page')} ${p}/${RETRY.PAGES}` + ` · ✓ ${set?.size ?? 0}` + dots());
+            let nd = null, lastErr = null;
+            for (let attempt = 1; attempt <= RETRY.FETCH; attempt++) {
+                try {
+                    nd = await fetchNextData(urlFn(uid, p));
+                    lastErr = null;
+                    break;
+                } catch (e) {
+                    lastErr = e;
+                    if (attempt < RETRY.FETCH) await sleep(700 * attempt + Math.random() * 300);
+                }
+            }
+            if (nd === null) {
+                if (lastErr) {
+                    // Transport failure: skip this page, keep going.
+                    failed++;
+                    console.warn(`[mrs] ${label} page ${p} failed after ${RETRY.FETCH} attempts:`, lastErr?.message ?? lastErr);
+                    setStatus(statusEl, `${label} ${t('page')} ${p}/${RETRY.PAGES} · ⚠️ ${failed} skipped` + dots());
+                    await sleep(Math.max(15, DELAY.HISTORY_PAGE - 20));
+                    continue;
+                }
+                break; // No __NEXT_DATA__ / no listing on this page: real end.
+            }
             const search = nd?.props?.pageProps?.mainColumnData?.advancedTitleSearch;
             const edges = search?.edges ?? [];
             if (!edges.length) break;
@@ -1901,6 +1928,10 @@
             if (!search?.pageInfo?.hasNextPage) break;
             await sleep(Math.max(15, DELAY.HISTORY_PAGE - 20));
         }
+        if (failed) {
+            console.warn(`[mrs] ${label}: ${failed} page(s) skipped — the resulting list may be incomplete`);
+        }
+        return failed;
     }
 
     async function getIMDbHistory(statusEl) {
@@ -1912,9 +1943,13 @@
             return imdbHistory = { rated: new Set(), watched: new Set() };
         }
         const rated = new Set(), watched = new Set();
-        await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings'), statusEl, rated);
-        await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory'), statusEl, watched);
-        return imdbHistory = { rated, watched };
+        const f1 = await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings'), statusEl, rated);
+        const f2 = await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory'), statusEl, watched);
+        const failed = (f1 || 0) + (f2 || 0);
+        // Keep the warning visible until the next status update: a silently
+        // truncated history looks like a bug to the user.
+        if (failed) setStatus(statusEl, `⚠️ ${failed} page(s) skipped — exported list may be incomplete`);
+        return imdbHistory = { rated, watched, failed };
     }
 
     const IMDB_GQL = 'https://api.graphql.imdb.com/';
@@ -2962,29 +2997,40 @@
 
     async function lbScrapePages(username, pathFn, parseFn, label, statusEl, maxPages = 200) {
         const all = [];
-        // Phase 1: Fetch first 3 pages in parallel to discover total page count
+        // Phase 1: Fetch first 3 pages in parallel to discover total page count.
+        // A single failed page must not demote the whole scan to serial mode,
+        // which used to cost ~7s per page (4-5 minutes for an 800-film library).
         setStatus(statusEl, `${label}: ${t('page')} 1-3${dots()}`);
-        const initialPages = await Promise.all([1, 2, 3].map(p => fetchLBHtml(pathFn(username, p)).catch(() => null)));
+        const initialPages = await Promise.all([1, 2, 3].map(async (p) => {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const html = await fetchLBHtml(pathFn(username, p)).catch(() => null);
+                if (html) return html;
+                await sleep(400 + attempt * 600);
+            }
+            return null;
+        }));
         let lastPageWithData = 0;
         let hasMore = false;
         for (let i = 0; i < initialPages.length; i++) {
             const html = initialPages[i];
-            if (!html) break;
+            if (!html) continue; // transient failure: keep going, don't stop the scan
             const items = parseFn(html);
-            if (!items.length) break;
+            if (!items.length) break; // genuinely empty page: real end
             all.push(...items);
             lastPageWithData = i + 1;
             if (html.match(LB_PAGINATION_NEXT_RE)) hasMore = true;
         }
         // Phase 2: Fetch remaining pages in parallel with low concurrency (Cloudflare-safe)
-        if (hasMore && lastPageWithData >= 3) {
+        if (hasMore) {
+            // Pages already fetched in phase 1 are reused, never re-requested.
+            const startPage = lastPageWithData + 1;
             const remaining = [];
-            for (let p = 4; p <= maxPages; p++) remaining.push(p);
+            for (let p = startPage; p <= maxPages; p++) remaining.push(p);
             if (remaining.length > 0) {
-                setStatus(statusEl, `${label}: ${t('page')} 4-${maxPages} (${all.length} ${t('movies')})${dots()}`);
+                setStatus(statusEl, `${label}: ${t('page')} ${startPage}-${maxPages} (${all.length} ${t('movies')})${dots()}`);
                 const poolResults = await asyncPool(5, remaining, async (p) => {
                     const html = await fetchLBHtml(pathFn(username, p));
-                    if (!html) return [];
+                    if (!html) return null;
                     const items = parseFn(html);
                     if (!items.length) return null; // signal: no more pages
                     return items;
@@ -2993,18 +3039,6 @@
                     if (r.status !== 'fulfilled' || !r.value) break;
                     all.push(...r.value);
                 }
-            }
-        } else if (hasMore && lastPageWithData < 3) {
-            // Fallback: sequential for pages after initial batch (if initial had < 3 pages)
-            for (let p = lastPageWithData + 1; p <= maxPages; p++) {
-                setStatus(statusEl, `${label}: ${t('page')} ${p} (${all.length} ${t('movies')})${dots()}`);
-                const html = await fetchLBHtml(pathFn(username, p));
-                if (!html) break;
-                const items = parseFn(html);
-                if (!items.length) break;
-                all.push(...items);
-                if (!html.match(LB_PAGINATION_NEXT_RE)) break;
-                await sleep(200);
             }
         }
         return all;
@@ -3988,8 +4022,9 @@
             (document.head || document.documentElement).appendChild(s);
         };
     __mrsAddStyle(`
-        #mrs-wrap{position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-        #mrs-panel{position:absolute;right:0;bottom:56px;transform-origin:bottom right;background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
+        #mrs-wrap{all:initial;position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:normal;text-align:initial;direction:ltr;color:#111}
+        #mrs-wrap *{box-sizing:border-box}
+        #mrs-panel{position:absolute;right:0;bottom:calc(100% + 12px);transform-origin:bottom right;background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;max-height:calc(100vh - 160px);overflow-y:auto;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
         #mrs-panel.mrs--visible{transform:scale(1) translateY(0);opacity:1;pointer-events:auto}
         #mrs-launcher{width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,0,0,0.12);background:#111;color:#fff;font:600 10px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.04em;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;padding:0;transition:transform .2s ease,background .2s ease}
         #mrs-launcher:hover{transform:scale(1.06);background:#222}
