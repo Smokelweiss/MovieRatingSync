@@ -201,6 +201,12 @@
                     timeout: timeout,
                     onload: function (r) {
                         clearTimeout(tid);
+                        // Extension bridge reports transport failures as status 0
+                        // with an `error` field (GM managers call onerror instead).
+                        if (r?.error && !(r.status > 0)) {
+                            reject(new Error(r.error));
+                            return;
+                        }
                         resolve({
                             ok: r.status >= 200 && r.status < 300,
                             status: r.status,
@@ -499,12 +505,18 @@
 
     function downloadCSV(csv, name) {
         // Use Blob parts to avoid concatenating BOM + entire CSV into one string
-        const a = Object.assign(document.createElement('a'), {
-            href: URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })),
-            download: name,
-        });
+        const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
+        const href = URL.createObjectURL(blob);
+        // Page-world (extension) mode: route the download through the content
+        // script → background so Chrome/Firefox handle it natively.
+        const ext = window.__mrsExtHook;
+        if (ext && typeof ext.download === 'function') {
+            Promise.resolve(ext.download(href, name)).finally(() => setTimeout(() => URL.revokeObjectURL(href), 60000));
+            return;
+        }
+        const a = Object.assign(document.createElement('a'), { href, download: name });
         a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        setTimeout(() => URL.revokeObjectURL(href), 10000);
     }
 
     function splitCsvLine(line) {
@@ -766,7 +778,11 @@
             genres: decodeHtmlEntities(parseList(movie.genre)),
             countries: decodeHtmlEntities(parseList(movie.countryOfOrigin)),
             runtime,
-            premiereDate: movie.datePublished || movie.dateCreated || '',
+            premiereDate: (() => {
+                // KP puts a bare year into datePublished; only a full date is useful.
+                const raw = movie.dateCreated || movie.datePublished || '';
+                return /^\d{4}-\d{2}-\d{2}/.test(String(raw)) ? String(raw).slice(0, 10) : '';
+            })(),
         };
     }
 
@@ -1398,7 +1414,8 @@
             lbSlug: '',
             yearStart: i.yearStart || i.year || '',
             yearEnd: i.yearEnd || '',
-            rating: i.rating == null ? (i.watched ? 'w' : '') : i.rating,
+            // Rating10 is numeric-only: watched-but-unrated items stay empty.
+            rating: i.rating == null ? null : i.rating,
             genres: i.genres || '',
             runtime: i.runtime || '',
             directors: i.directors || '',
@@ -3090,7 +3107,8 @@
     // `parser(html)` should return the parsed value or null/throw on failure.
     async function fetchWithRetry(url, parser, id, opts = {}) {
         const name = opts.name || 'fetch';
-        for (let attempt = 1; attempt <= RETRY.FETCH; attempt++) {
+        const maxAttempts = opts.attempts || RETRY.FETCH;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Jitter before each request to spread concurrent load
                 if (opts.jitter) await sleep(Math.random() * opts.jitter);
@@ -3111,14 +3129,18 @@
                     return null;
                 }
                 if (!r.ok) {
-                    if (attempt < RETRY.FETCH) await sleep(500 * attempt + Math.random() * 200);
+                    if (attempt < maxAttempts) await sleep(500 * attempt + Math.random() * 200);
                     continue;
                 }
                 const html = await r.text();
-                return parser(html);
+                const parsed = parser(html);
+                // `null` means "this page has no usable data" — retrying the same URL
+                // cannot help, so let the caller try the next URL.
+                if (parsed == null) return null;
+                return parsed;
             } catch (e) {
                 console.warn(`[mrs] ${name} failed for ${id}:`, e.message);
-                if (attempt < RETRY.FETCH) await sleep(500 * attempt + Math.random() * 200);
+                if (attempt < maxAttempts) await sleep(500 * attempt + Math.random() * 200);
             }
         }
         return null;
@@ -3292,94 +3314,117 @@
             return null;
         }
     }
-    let _kpGqlFailureTime = 0;  // timestamp of last GQL failure streak; 60s backoff after failures
-    async function kpFetchFilmDetailsHTML(kpId) {
-        if (!kpId || !/^\d+$/.test(String(kpId))) return null;
-        let gqlResult = null;
-        const backoffUntil = _kpGqlFailureTime + 60000;
-        if (Date.now() >= backoffUntil) {
-            gqlResult = await kpFetchFilmDetailsGQL(kpId);
-            if (gqlResult) { _kpGqlFailureTime = 0; }
-            else {
-                if (_kpGqlFailureTime === 0) _kpGqlFailureTime = Date.now();
-                console.warn("[mrs] KP GQL failed for kpId=");
-            }
-        } else {
-            DEBUG && console.log("[mrs] KP GQL on backoff, skipping for kpId=");
+    // Kinopoisk GraphQL requires a signed operation hash and rejects anonymous
+    // POSTs, so the public film page is the primary source: it ships schema.org
+    // JSON-LD plus the full Apollo SSR state with crew/genres/runtime.
+    let _kpGqlFailureTime = Date.now();  // assume GQL is broken until a film page proves otherwise
+    // Parse one Kinopoisk film page into extended metadata. Returns null when the
+    // page carries no film data (bot wall, removed title, wrong URL type).
+    // Exposed on window so the parsers can be regression-tested from the console.
+    function parseKPFilmPage(html, pageUrl, kpId) {
+        // Prefer schema.org JSON-LD for directors/actors/genres/runtime.
+        const schema = extractSchemaOrg(html, pageUrl);
+        const allTitles = [];
+        let runtime = '', directors = '', actors = '', genres = '', premiereDate = '', type = '';
+        if (schema) {
+            if (schema.title) allTitles.push(decodeHtmlEntities(schema.title));
+            if (schema.altTitles?.length) allTitles.push(...schema.altTitles.map(decodeHtmlEntities));
+            runtime = schema.runtime || '';
+            directors = schema.directors || '';
+            actors = schema.actors || '';
+            genres = schema.genres || '';
+            premiereDate = schema.premiereDate || '';
         }
-        if (gqlResult) return gqlResult;
-        // Fallback: fetch HTML page (avoid recursion)
-        const url = `https://www.kinopoisk.ru/film/${kpId}/`;
-        return fetchWithRetry(url, html => {
-            // Prefer schema.org JSON-LD for directors/actors/genres/runtime.
-            const schema = extractSchemaOrg(html, url);
-            const allTitles = [];
-            let runtime = '', directors = '', actors = '', genres = '', premiereDate = '';
-            if (schema) {
-                if (schema.title) allTitles.push(decodeHtmlEntities(schema.title));
-                if (schema.altTitles?.length) allTitles.push(...schema.altTitles.map(decodeHtmlEntities));
-                runtime = schema.runtime || '';
-                directors = schema.directors || '';
-                actors = schema.actors || '';
-                genres = schema.genres || '';
-                premiereDate = schema.premiereDate || '';
-            }
-            // Fallback to SSR Apollo state for alternative titles and crew.
-            try {
-                const ssrMatch = html.match(/window\.Ya\.__ssr_initial_data\s*=\s*({[\s\S]*?});?\s*<\/script>/);
-                if (ssrMatch) {
-                    let ssr = JSON.parse(ssrMatch[1]);
-                    const state = ssr?.apolloState;
-                    if (state) {
-                        const movieEntry = Object.values(state).find(v => v && v.__typename && (v.__typename === 'Film' || v.__typename === 'TvSeries' || v.__typename === 'MiniSeries' || v.__typename === 'TvShow'));
-                        if (movieEntry) {
-                            const movie = movieEntry;
-                            if (movie.title?.russian) allTitles.push(decodeHtmlEntities(movie.title.russian));
-                            if (movie.title?.original) allTitles.push(decodeHtmlEntities(movie.title.original));
-                            if (Array.isArray(movie.title?.alternative)) {
-                                for (const t of movie.title.alternative) {
-                                    if (t?.name) allTitles.push(decodeHtmlEntities(t.name));
-                                }
-                            }
-                            if (!runtime && movie.duration != null) runtime = String(movie.duration);
-                            if (!premiereDate) premiereDate = movie.premiereWorld?.date || movie.premiereWorld || '';
-                            const crew = movie.crew || movie.creators || movie.directors;
-                            const dirNames = [];
-                            if (Array.isArray(crew) && !directors) {
-                                for (const c of crew) {
-                                    const person = c?.__ref ? state[c.__ref] : c;
-                                    if (!person) continue;
-                                    const name = decodeHtmlEntities(person.name?.russian || person.name?.original || person.name);
-                                    if (!name) continue;
-                                    const prof = (person.profession || person.professionName || '').toLowerCase();
-                                    if (prof.includes('director') || prof.includes('режиссер')) dirNames.push(name);
-                                }
-                                directors = dirNames.slice(0, 3).join(', ');
-                            }
-                            const cast = movie.cast || movie.actors;
-                            const actorNames = [];
-                            if (Array.isArray(cast) && !actors) {
-                                for (const a of cast) {
-                                    const person = a?.__ref ? state[a.__ref] : a;
-                                    if (!person) continue;
-                                    const name = decodeHtmlEntities(person.name?.russian || person.name?.original || person.name);
-                                    if (name) actorNames.push(name);
-                                }
-                                actors = actorNames.slice(0, 3).join(', ');
-                            }
+        // SSR Apollo state: film type, alternative titles, crew, genres, duration.
+        try {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const ssr = parseKPSSRJson(doc);
+            const state = ssr?.apolloState;
+            if (state) {
+                const movie = state[`Film:${kpId}`] || state[`TvSeries:${kpId}`]
+                    || Object.values(state).find(v => v && v.id != null && String(v.id) === String(kpId));
+                if (movie) {
+                    type = movie.__typename || '';
+                    if (movie.title?.russian) allTitles.push(decodeHtmlEntities(movie.title.russian));
+                    if (movie.title?.localized) allTitles.push(decodeHtmlEntities(movie.title.localized));
+                    if (movie.title?.original) allTitles.push(decodeHtmlEntities(movie.title.original));
+                    if (Array.isArray(movie.title?.alternative)) {
+                        for (const t of movie.title.alternative) {
+                            const name = typeof t === 'string' ? t : t?.name;
+                            if (name) allTitles.push(decodeHtmlEntities(name));
                         }
                     }
+                    if (!runtime && movie.duration != null) runtime = String(movie.duration);
+                    if (!premiereDate && movie.worldPremiere?.date) premiereDate = movie.worldPremiere.date;
+                    const collectPeople = (val, limit) => {
+                        const arr = Array.isArray(val) ? val : (val?.items || []);
+                        const names = [];
+                        for (const entry of arr) {
+                            const person = entry?.__ref ? state[entry.__ref]
+                                : (entry?.person?.__ref ? state[entry.person.__ref] : (entry?.person || entry));
+                            if (!person) continue;
+                            // KP SSR keeps the display name in `name.russian` for some
+                            // entries and in `originalName` for others — try both.
+                            const name = decodeHtmlEntities(person.name?.russian || person.name?.original
+                                || person.name || person.originalName || '');
+                            if (name && !names.includes(name)) names.push(name);
+                            if (names.length >= limit) break;
+                        }
+                        return names.join(', ');
+                    };
+                    const movieFields = Object.keys(movie);
+                    const directorField = movieFields.find(f => /^members\(\{.*"role":"DIRECTOR"/.test(f));
+                    const writerField = movieFields.find(f => /^members\(\{.*"role":"WRITER"/.test(f));
+                    const actorField = movieFields.find(f => /^members\(\{.*"role":\[?"?ACTOR/.test(f));
+                    if (!directors && directorField) directors = collectPeople(movie[directorField], 3);
+                    if (!directors && writerField) directors = collectPeople(movie[writerField], 1);
+                    if (!actors && actorField) actors = collectPeople(movie[actorField], 10);
+                    if (!genres && movie.genres?.length) {
+                        genres = movie.genres.map(g => {
+                            const gObj = g?.__ref ? state[g.__ref] : g;
+                            return gObj?.name || '';
+                        }).filter(Boolean).join(', ');
+                    }
                 }
-            } catch (e) { /* ignore fallback errors */ }
-            return {
-                allTitles: [...new Set(allTitles.filter(Boolean))],
-                runtime,
-                directors,
-                actors,
-                genres,
-                premiereDate: premiereDate ? String(premiereDate).split('T')[0] : '',
-            };
-        }, kpId, { name: 'KP film details fetch', jitter: 300 });
+            }
+        } catch (e) { /* ignore SSR errors */ }
+        // A page with neither JSON-LD nor SSR movie data is not a film page.
+        if (!schema && !type && !allTitles.length) return null;
+        return {
+            type: type === 'Film' ? 'Film' : (type ? 'TvSeries' : ''),
+            allTitles: [...new Set(allTitles.filter(Boolean))],
+            runtime,
+            directors,
+            actors,
+            genres,
+            premiereDate: premiereDate ? String(premiereDate).split('T')[0] : '',
+        };
+    }
+    try { if (typeof window !== 'undefined') window.mrsParseKPFilmPage = parseKPFilmPage; } catch (e) { /* ignore */ }
+
+    async function kpFetchFilmDetailsHTML(kpId) {
+        if (!kpId || !/^\d+$/.test(String(kpId))) return null;
+        // Facade pages (/film/N/) predate the current film pages and have no metadata.
+        if (+kpId < 100000) return null;
+        // Typed URL: some KP ids are only reachable with a type prefix, so try both.
+        const urls = [`https://www.kinopoisk.ru/film/${kpId}/`, `https://www.kinopoisk.ru/series/${kpId}/`];
+        for (const url of urls) {
+            const result = await fetchWithRetry(
+                url,
+                html => parseKPFilmPage(html, url, kpId),
+                kpId,
+                { name: 'KP film details fetch', jitter: 300, attempts: 1 }
+            );
+            if (result) return result;
+        }
+        // Last resort: GraphQL (best effort, may be rejected by the API).
+        if (Date.now() >= _kpGqlFailureTime + 5 * 60000) {
+            const gqlResult = await kpFetchFilmDetailsGQL(kpId);
+            if (gqlResult) { _kpGqlFailureTime = 0; return gqlResult; }
+            _kpGqlFailureTime = Date.now();
+            DEBUG && console.log('[mrs] KP GQL detail fetch unavailable, using HTML only');
+        }
+        return null;
     }
 
     async function performLBExport(statusEl) {
@@ -4103,9 +4148,33 @@
             const launcher = Object.assign(document.createElement('button'), {
                 type: 'button',
                 id: 'mrs-launcher',
-                textContent: 'MRS',
                 title: 'Movie Rating Sync',
             });
+            // Cyclic arrow = "sync". Built with createElementNS so no innerHTML is needed.
+            const SVG_NS = 'http://www.w3.org/2000/svg';
+            const icon = document.createElementNS(SVG_NS, 'svg');
+            icon.setAttribute('viewBox', '0 0 24 24');
+            icon.setAttribute('width', '24');
+            icon.setAttribute('height', '24');
+            icon.setAttribute('aria-hidden', 'true');
+            icon.setAttribute('focusable', 'false');
+            const arc1 = document.createElementNS(SVG_NS, 'path');
+            arc1.setAttribute('d', 'M20 12a8 8 0 0 1-13.66 5.66');
+            const arc2 = document.createElementNS(SVG_NS, 'path');
+            arc2.setAttribute('d', 'M4 12a8 8 0 0 1 13.66-5.66');
+            const head1 = document.createElementNS(SVG_NS, 'path');
+            head1.setAttribute('d', 'M17 3.5v4h-4');
+            const head2 = document.createElementNS(SVG_NS, 'path');
+            head2.setAttribute('d', 'M7 20.5v-4h4');
+            for (const p of [arc1, arc2, head1, head2]) {
+                p.setAttribute('fill', 'none');
+                p.setAttribute('stroke', 'currentColor');
+                p.setAttribute('stroke-width', '2');
+                p.setAttribute('stroke-linecap', 'round');
+                p.setAttribute('stroke-linejoin', 'round');
+                icon.appendChild(p);
+            }
+            launcher.appendChild(icon);
             launcher.setAttribute('aria-controls', 'mrs-panel');
             launcher.setAttribute('aria-expanded', 'false');
             const setPanelOpen = (open) => {

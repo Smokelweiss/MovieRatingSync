@@ -38,6 +38,16 @@ A cross-platform userscript to sync, backup, and migrate your movie ratings betw
 
 ### 🚀 Installation
 
+**Option A — browser extension (recommended)**
+
+The extension ships the same engine as a native WebExtension, so it keeps working when a site tightens its CSP.
+
+* **Firefox:** `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `extension/manifest.firefox.json`.
+* **Chrome / Edge:** `chrome://extensions` (or `edge://extensions`) → enable **Developer mode** → **Load unpacked** → pick the `extension` folder.
+* The icon shows up in the toolbar; the in-page launcher is the round **sync-arrow** button in the bottom-right corner.
+
+**Option B — userscript**
+
 1. Install a userscript manager: [Tampermonkey](https://www.tampermonkey.net/) *(recommended)* or [Violentmonkey](https://violentmonkey.github.io/).
 2. Open [`movie-rating-sync.user.js`](movie-rating-sync.user.js) in this repository.
 3. Click **Raw** — your userscript manager will offer to install it.
@@ -51,9 +61,12 @@ A cross-platform userscript to sync, backup, and migrate your movie ratings betw
 
 ### 🧪 Development
 
-* `node -c movie-rating-sync.user.js` — syntax check.
+* `node --check movie-rating-sync.user.js` — syntax check.
+* `node tools/build-extension.js` — **required after every userscript change**: regenerates `extension/content.js` from the userscript (the userscript is the single source of truth).
+* `powershell -File tools/make-icons.ps1` — regenerates `extension/icons/*` from `icon.png`.
 * `node tests/pure-functions.test.js` — pure-function unit tests.
 * `node tests/i18n.test.js` — translation key parity checks.
+* `node tests/extension-build.test.js` — checks the generated extension file still honours its GM_* shim and launcher icon.
 * Manual test guide: [`MANUAL_TEST_GUIDE.md`](MANUAL_TEST_GUIDE.md)
 
 ---
@@ -83,6 +96,16 @@ A cross-platform userscript to sync, backup, and migrate your movie ratings betw
 
 ### 🚀 Установка
 
+**Вариант A — расширение браузера (рекомендуется)**
+
+Расширение содержит тот же движок, что и скрипт, но как полноценный WebExtension — оно продолжает работать, когда сайт ужесточает CSP.
+
+* **Firefox:** `about:debugging#/runtime/this-firefox` → **Загрузить временное дополнение** → выберите `extension/manifest.firefox.json`.
+* **Chrome / Edge:** `chrome://extensions` (или `edge://extensions`) → включите **Режим разработчика** → **Загрузить распакованное** → выберите папку `extension`.
+* Иконка появится на панели; на странице — круглая кнопка со **стрелками синхронизации** в правом нижнем углу.
+
+**Вариант B — пользовательский скрипт**
+
 1. Установите менеджер пользовательских скриптов: [Tampermonkey](https://www.tampermonkey.net/) *(рекомендуется)* или [Violentmonkey](https://violentmonkey.github.io/).
 2. Откройте файл [`movie-rating-sync.user.js`](movie-rating-sync.user.js) в этом репозитории.
 3. Нажмите **Raw** — менеджер скриптов предложит установку.
@@ -96,9 +119,12 @@ A cross-platform userscript to sync, backup, and migrate your movie ratings betw
 
 ### 🧪 Разработка
 
-* `node -c movie-rating-sync.user.js` — проверка синтаксиса.
+* `node --check movie-rating-sync.user.js` — проверка синтаксиса.
+* `node tools/build-extension.js` — **обязательно после каждой правки скрипта**: пересобирает `extension/content.js` из `movie-rating-sync.user.js` (скрипт — единственный источник истины).
+* `powershell -File tools/make-icons.ps1` — пересобирает `extension/icons/*` из `icon.png`.
 * `node tests/pure-functions.test.js` — юнит-тесты чистых функций.
 * `node tests/i18n.test.js` — проверка паритета ключей переводов.
+* `node tests/extension-build.test.js` — проверяет, что собранный файл расширения по-прежнему работает с GM_*-шихтой и иконкой лаунчера.
 * Руководство по ручному тестированию: [`MANUAL_TEST_GUIDE.md`](MANUAL_TEST_GUIDE.md)
 
 ---
