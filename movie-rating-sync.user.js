@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.3
+// @version      1.4
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -313,6 +313,8 @@
 
     const kpGqlProbe = makeProbe(20, PLATFORM_MAX.kpGql); const pageBetweenDelay = { val: DELAY.PAGE_BETWEEN };
     const gqlProbe = makeProbe(20, PLATFORM_MAX.imdb);
+    // Letterboxd listing cache: reused within one scan, 10 min TTL.
+    const lbPageCache = new Map();
     const lbProbe = makeProbe(20, PLATFORM_MAX.lb);
     const imdbProbe = makeProbe(20, PLATFORM_MAX.imdb);
     const kpGqlDelay = { val: DELAY.GQL_INIT }, imdbGqlDelay = { val: DELAY.GQL_INIT };
@@ -320,10 +322,103 @@
     const clearStatus = (el) => {
         if (!el) return;
         if (el.__timerInterval) { clearInterval(el.__timerInterval); el.__timerInterval = null; }
+        clearInterval(el.__statusTimer); el.__statusTimer = null;
+        el.__titleText = null;
+        el.__statusStart = null;
         el.textContent = '';
         el.style.display = 'none';
         el.__progressBar = null;
     };
+
+    // ── Multi-channel status ────────────────────────────────────────────────
+    // Ratings / Diary / Watched / Likes are scraped in parallel. Writing all of
+    // them into one line made the text flip back and forth, so each channel now
+    // owns its own row inside the status card and updates independently.
+    function ensureChannels(el) {
+        if (!el) return null;
+        let list = el.querySelector('.mrs-status__channels');
+        if (!list) {
+            list = document.createElement('div');
+            list.className = 'mrs-status__channels';
+            const header = el.querySelector('.mrs-status__header');
+            if (header && header.parentNode === el) header.after(list);
+            else el.appendChild(list);
+        }
+        return list;
+    }
+
+    function channelRow(el, channel) {
+        const list = ensureChannels(el);
+        if (!list) return null;
+        let row = list.querySelector('[data-channel="' + CSS.escape(channel) + '"]');
+        if (row) return row;
+
+        row = document.createElement('div');
+        row.className = 'mrs-status__row';
+        row.dataset.channel = channel;
+        row.dataset.started = String(Date.now());
+        const label = document.createElement('span');
+        label.className = 'mrs-status__row-label';
+        label.textContent = channel;
+        const text = document.createElement('span');
+        text.className = 'mrs-status__row-text';
+        row.append(label, text);
+        list.appendChild(row);
+        return row;
+    }
+
+    // Text stays put; only the muted part after the separator is rewritten, so
+    // a row never flashes between two unrelated states.
+    function setRowParts(row, main, meta) {
+        const textEl = row.querySelector('.mrs-status__row-text');
+        if (!textEl) return;
+        let mainEl = textEl.querySelector('.mrs-status__row-main');
+        let metaEl = textEl.querySelector('.mrs-status__row-meta');
+        if (!mainEl) { mainEl = document.createElement('span'); mainEl.className = 'mrs-status__row-main'; textEl.appendChild(mainEl); }
+        if (!metaEl) { metaEl = document.createElement('span'); metaEl.className = 'mrs-status__row-meta'; textEl.appendChild(metaEl); }
+        if (mainEl.textContent !== main) mainEl.textContent = main;
+        const metaText = meta ? '\u00b7 ' + meta : '';
+        if (metaEl.textContent !== metaText) metaEl.textContent = metaText;
+    }
+
+    function setChannelStatus(el, channel, text, progress) {
+        if (!el || !channel) return;
+        el.style.display = 'block';
+        const row = channelRow(el, channel);
+        if (!row) return;
+        const meta = (progress && progress.total) ? progress.current + '/' + progress.total : '';
+        if (progress && progress.total) {
+            row.dataset.done = String(progress.current);
+            row.dataset.total = String(progress.total);
+        } else if (!row.dataset.mark) {
+            const secs = Math.max(0, Math.round((Date.now() - Number(row.dataset.started || Date.now())) / 1000));
+            setRowParts(row, text, secs >= 1 ? formatElapsed(secs * 1000) : '');
+            return;
+        }
+        setRowParts(row, text, meta);
+    }
+
+    function finishChannel(el, channel, ok) {
+        if (!el || !channel) return;
+        const row = el.querySelector('[data-channel="' + CSS.escape(channel) + '"]');
+        if (!row || row.dataset.mark) return;
+        row.dataset.mark = ok ? 'ok' : 'fail';
+        row.classList.add(ok ? 'mrs-status__row--done' : 'mrs-status__row--fail');
+        // Drop the muted progress part and put the mark in the row tail, so it
+        // stays visible even when the label text is ellipsised.
+        const meta = row.querySelector('.mrs-status__row-text .mrs-status__row-meta');
+        if (meta) meta.remove();
+        const mark = document.createElement('span');
+        mark.className = 'mrs-status__row-mark';
+        mark.textContent = ok ? '\u2713' : '!';
+        row.appendChild(mark);
+    }
+
+    // Writer bound to one channel; callers just push text/progress.
+    function channelWriter(el, channel) {
+        return (text, progress) => setChannelStatus(el, channel, text, progress);
+    }
+
 
     const setStatus = (el, text, progress) => {
         if (!el) return;
@@ -350,15 +445,33 @@
             el.appendChild(progressEl);
             el.__progressBar = bar;
             el.__statusStart = Date.now();
-            if (!el.__timerInterval) {
-                el.__timerInterval = setInterval(() => {
-                    const timer = el.querySelector('.mrs-status__timer');
+            if (!el.__statusTimer) {
+                el.__statusTimer = setInterval(() => {
+                    const timer = el.querySelector('.mrs-status__title-timer');
                     if (timer && el.__statusStart) timer.textContent = formatElapsed(Date.now() - el.__statusStart);
-                }, 1000);
+                }, 500);
             }
         }
         const titleSpan = el.querySelector('.mrs-status__title');
-        if (titleSpan) titleSpan.textContent = text;
+        if (titleSpan) {
+            // Only touch the DOM when the visible text really changes; rewriting
+            // identical text still re-renders and reads as flicker.
+            const cached = el.__titleText || '';
+            if (cached !== text) {
+                el.__titleText = text;
+                let main = titleSpan.querySelector('.mrs-status__title-text');
+                if (!main) {
+                    titleSpan.textContent = '';
+                    main = document.createElement('span');
+                    main.className = 'mrs-status__title-text';
+                    const stamp = document.createElement('span');
+                    stamp.className = 'mrs-status__title-timer';
+                    titleSpan.append(main, stamp);
+                }
+                main.textContent = text;
+            }
+        }
+
         if (progress && el.__progressBar) {
             const pct = Math.round((progress.current / progress.total) * 100);
             el.__progressBar.style.width = pct + '%';
@@ -367,6 +480,9 @@
 
     function renderResult(el, title, pairs, done, elapsedMs) {
         if (el.__timerInterval) { clearInterval(el.__timerInterval); el.__timerInterval = null; }
+        clearInterval(el.__statusTimer); el.__statusTimer = null;
+        el.__titleText = null;
+        el.__statusStart = null;
         el.textContent = '';
         el.style.display = 'block';
         const header = document.createElement('div');
@@ -1349,7 +1465,13 @@
         if (totalPages > 1) {
             const pageNums = [];
             for (let p = 2; p <= totalPages; p++) pageNums.push(p);
+            let kpPagesDone = 1; // page 1 was fetched above
+            const kpPageReport = () => setStatus(statusEl,
+                t('loadingPage', { p: kpPagesDone, total: '/' + totalPages, count: allItems.length }) + dots(),
+                { current: kpPagesDone, total: totalPages });
+            kpPageReport();
             const pageResults = await asyncPool(10, pageNums, async (p) => {
+                try {
                 for (let attempt = 1; attempt <= 3; attempt++) {
                     const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
                     if (!doc) break;
@@ -1360,6 +1482,10 @@
                     if (attempt < 3) { stats.retries++; await sleep(800 * attempt); }
                 }
                 return { page: p, items: [] };
+                } finally {
+                    kpPagesDone++;
+                    if (kpPagesDone % 2 === 0 || kpPagesDone >= totalPages) kpPageReport();
+                }
             });
             for (const r of pageResults) {
                 if (r.status === 'fulfilled' && r.value && r.value.items.length) {
@@ -1378,17 +1504,25 @@
         const unique = [...new Map(allItems.map(i => [i.kpId, i])).values()];
 
         // Fetch film details from Kinopoisk film pages
-        setStatus(statusEl, `Fetching film details for ${unique.length} films...` + dots());
+        setStatus(statusEl, `Fetching film details: 0/${unique.length}`, { current: 0, total: unique.length });
         const kpRateLimit = makeRateLimiter(15);
+        let kpDetailsDone = 0;
         const kpDetailResults = await asyncPool(20, unique, async i => {
-            if (!i.kpId) return null;
-            const cacheKey = 'kp:' + i.kpId;
-            const cached = filmDetailCache.get(cacheKey);
-            if (cached) return cached;
-            await kpRateLimit();
-            const result = await kpFetchFilmDetailsHTML(i.kpId);
-            if (result) filmDetailCache.set(cacheKey, result);
-            return result;
+            try {
+                if (!i.kpId) return null;
+                const cacheKey = 'kp:' + i.kpId;
+                const cached = filmDetailCache.get(cacheKey);
+                if (cached) return cached;
+                await kpRateLimit();
+                const result = await kpFetchFilmDetailsHTML(i.kpId);
+                if (result) filmDetailCache.set(cacheKey, result);
+                return result;
+            } finally {
+                kpDetailsDone++;
+                if (kpDetailsDone % 5 === 0 || kpDetailsDone === unique.length) {
+                    setStatus(statusEl, `Fetching film details: ${kpDetailsDone}/${unique.length}`, { current: kpDetailsDone, total: unique.length });
+                }
+            }
         });
         kpDetailResults.forEach((r, i) => {
             const item = unique[i];
@@ -2017,7 +2151,15 @@
         for (let i = 1; i <= RETRY.GQL; i++) {
             try {
                 const r = await fetchT(IMDB_GQL, 10000, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    method: 'POST',
+                    // IMDb's GraphQL gateway answers 403 when Origin/Referer are
+                    // missing, which used to fake an "API unavailable" warning.
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': 'https://www.imdb.com',
+                        'Referer': 'https://www.imdb.com/',
+                    },
+                    credentials: 'include',
                     body: JSON.stringify({ query, variables }),
                 });
                 if (!r) { adjDelay(imdbGqlDelay, 'error'); continue; }
@@ -2726,11 +2868,12 @@
         }
     }
 
-    // Health-check: test IMDb GraphQL endpoint with a known title before bulk operations
+    // Health-check: confirm IMDb GraphQL answers before a bulk operation.
+    // A failure here is NOT fatal — the export path itself has its own retries,
+    // so this only logs a hint instead of alarming the user.
     async function imdbHealthCheck() {
         try {
-            // Use imdbGql to reuse existing retry/429/error handling
-            const json = await imdbGql('query { title(id: \"tt0111161\") { id titleText { text } } }', {});
+            const json = await imdbGql('query { title(id: "tt0111161") { id titleText { text } } }', {});
             return !!(json?.data?.title);
         } catch (e) { return false; }
     }
@@ -2739,13 +2882,9 @@
         setStatus(statusEl, t('profileDetect', { platform: 'IMDb' }) + dots());
         const uid = getIMDbUid();
         if (!uid) throw new Error(t('imdbUserIdNotFound'));
-        // Health-check IMDb GraphQL API
-        const apiOk = await imdbHealthCheck();
-        if (!apiOk) {
-            console.warn('[mrs] IMDb GraphQL API health-check failed — API may be unavailable or changed');
-            setStatus(statusEl, '⚠️ IMDb API may be unavailable — retrying...');
-            await sleep(3000);
-        }
+        // Optional warm-up probe. IMDb's gateway intermittently throttles the
+        // first request of a session; that is not an error worth showing.
+        imdbHealthCheck().then(ok => { if (!ok) console.info('[mrs] IMDb probe skipped — export continues with per-request retries'); });
         resetTitleMap(); imdbHistory = null;
 
         const HASH = '7c4e0771d67f21fc27fd44fc46d49cc589225a9c5e63e51cc0b8d42f39ee99cc';
@@ -2800,7 +2939,8 @@
         const results = await Promise.allSettled(batches.map(batch =>
             fetchT(IMDB_GQL, 30000, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Origin': 'https://www.imdb.com', 'Referer': 'https://www.imdb.com/' },
+                credentials: 'include',
                 body: JSON.stringify({
                     operationName: 'PersonalizedUserData',
                     variables: { locale: 'en-US', idArray: batch, includeUserData: true, includeWatchedData: true, location: { latLong: { lat: '55.75', long: '37.58' } }, fetchOtherUserRating: false },
@@ -2841,7 +2981,7 @@
 
         // Fetch film details (titles + extended metadata) from IMDb film pages
         const uniqueItems = [...itemMap.values()];
-        setStatus(statusEl, `Fetching film details for ${uniqueItems.length} films...` + dots());
+        setStatus(el, t('fetchingLid', { count: uniqueItems.length }), { current: 0, total: uniqueItems.length });
         const imdbRateLimit = makeRateLimiter(15);
         const titleResults = await asyncPool(25, uniqueItems, async i => {
             if (!i.ttId) return null;
@@ -3035,62 +3175,70 @@
         return results;
     }
 
-    async function lbScrapePages(username, pathFn, parseFn, label, statusEl, maxPages = 200) {
+    // Scrapes Letterboxd listing pages (ratings / diary / watched / likes).
+    // Progress goes through `onProgress(done, total)` so the caller owns its own
+    // status row. One scan per tab is cached for 10 minutes.
+    async function lbScrapePages(username, pathFn, parseFn, pageSize = 200, onProgress = null) {
+        const key = typeof pathFn === 'function' ? pathFn(username, 1) : null;
+        if (key && lbPageCache.has(key)) {
+            const hit = lbPageCache.get(key);
+            if (Date.now() - hit.ts < 10 * 60 * 1000) {
+                if (onProgress) onProgress(1, 1);
+                return hit.entries;
+            }
+            lbPageCache.delete(key);
+        }
+
+        const byPage = new Map();
+        const add = (p, items) => {
+            if (!items?.length) return;
+            if (!byPage.has(p)) byPage.set(p, []);
+            const bucket = byPage.get(p);
+            const seen = new Set(bucket.map(i => i.slug));
+            for (const item of items) {
+                if (!item.slug || seen.has(item.slug)) continue;
+                seen.add(item.slug);
+                bucket.push(item);
+            }
+        };
+        const report = (done, total) => { if (onProgress) onProgress(done, Math.max(done, total)); };
+
+        // Phase 1: a small parallel window discovers how deep the library goes.
+        // A single failed page no longer forces a slow serial pass.
+        const scanned = new Set();
+        const firstBatch = [];
+        for (let p = 1; p <= Math.min(pageSize, 5); p++) firstBatch.push(p);
+        await asyncPool(5, firstBatch, async (p) => {
+            const html = await fetchLBHtml(pathFn(username, p));
+            scanned.add(p);
+            if (html) add(p, parseFn(html));
+        });
+        report(scanned.size, scanned.size);
+
+        // Phase 2: fetch the rest in windows, stopping once a window adds nothing.
+        let next = firstBatch[firstBatch.length - 1] + 1;
+        while (next <= pageSize) {
+            const pages = [];
+            for (let p = next; p < next + 10 && p <= pageSize; p++) pages.push(p);
+            let fetched = 0;
+            let items = 0;
+            await asyncPool(5, pages, async (p) => {
+                const html = await fetchLBHtml(pathFn(username, p));
+                scanned.add(p);
+                if (!html) return;
+                const parsed = parseFn(html);
+                fetched++;
+                items += parsed ? parsed.length : 0;
+                add(p, parsed);
+            });
+            next += pages.length;
+            report(scanned.size, next - 1);
+            if (items === 0 || fetched === 0) break;
+        }
+
         const all = [];
-        // Phase 1: Fetch first 3 pages in parallel to discover total page count.
-        // A single failed page must not demote the whole scan to serial mode,
-        // which used to cost ~7s per page (4-5 minutes for an 800-film library).
-        setStatus(statusEl, `${label}: ${t('page')} 1-3${dots()}`);
-        const initialPages = await Promise.all([1, 2, 3].map(async (p) => {
-            for (let attempt = 0; attempt < 3; attempt++) {
-                const html = await fetchLBHtml(pathFn(username, p)).catch(() => null);
-                if (html) return html;
-                await sleep(400 + attempt * 600);
-            }
-            return null;
-        }));
-        let lastPageWithData = 0;
-        let hasMore = false;
-        for (let i = 0; i < initialPages.length; i++) {
-            const html = initialPages[i];
-            if (!html) continue; // transient failure: keep going, don't stop the scan
-            const items = parseFn(html);
-            if (!items.length) break; // genuinely empty page: real end
-            all.push(...items);
-            lastPageWithData = i + 1;
-            if (html.match(LB_PAGINATION_NEXT_RE)) hasMore = true;
-        }
-        // Phase 2: Fetch remaining pages in parallel with low concurrency (Cloudflare-safe)
-        if (hasMore) {
-            // Pages already fetched in phase 1 are reused, never re-requested.
-            const startPage = lastPageWithData + 1;
-            const remaining = [];
-            for (let p = startPage; p <= maxPages; p++) remaining.push(p);
-            if (remaining.length > 0) {
-                // Count finished pages and films as they arrive, so a long scan
-                // visibly moves instead of freezing on a static "page 4-200" line.
-                let donePages = 0;
-                let collected = 0;
-                const report = () => {
-                    setStatus(statusEl, `${label}: ${t('page')} ${donePages}/${remaining.length} \u00b7 ${collected} ${t('movies')}${dots()}`);
-                };
-                report();
-                const poolResults = await asyncPool(5, remaining, async (p) => {
-                    const html = await fetchLBHtml(pathFn(username, p));
-                    const items = html ? parseFn(html) : null;
-                    donePages++;
-                    if (items?.length) collected += items.length;
-                    if (donePages % 3 === 0 || donePages === remaining.length) report();
-                    if (!html) return null;
-                    if (!items?.length) return null; // signal: no more pages
-                    return items;
-                });
-                for (const r of poolResults) {
-                    if (r.status !== 'fulfilled' || !r.value) break;
-                    all.push(...r.value);
-                }
-            }
-        }
+        for (const [, items] of [...byPage.entries()].sort((x, y) => x[0] - y[0])) all.push(...items);
+        if (key) lbPageCache.set(key, { entries: all, ts: Date.now() });
         return all;
     }
 
@@ -3512,6 +3660,7 @@
     }
 
     async function performLBExport(statusEl) {
+        const el = statusEl;
         const username = getLBUsername();
         if (!username) throw new Error(t('lbUsernameNotFound'));
 
@@ -3525,12 +3674,28 @@
             if (i.filmId && !ex.filmId) ex.filmId = i.filmId;
         });
 
+        // One row per source: each row owns its own channel and never fights
+        // another one for the same line, so nothing flickers.
+        const chRatings = channelWriter(el, t('ratings'));
+        const chDiary = channelWriter(el, t('diary'));
+        const chWatched = channelWriter(el, t('watched'));
+        const chLikes = channelWriter(el, t('likes'));
+        const scrape = (write, pathFn, parseFn) => lbScrapePages(username, pathFn, parseFn, 200,
+            (done, total) => write(`${t('page')} ${done}/${total}`, { current: done, total }));
+        const settle = (channel, p) => p.then(
+            (value) => { finishChannel(el, channel, true); return value; },
+            (err) => { finishChannel(el, channel, false); throw err; }
+        );
+        const started = Date.now();
         const [ratings, diary, watched, liked] = await Promise.all([
-            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, t('ratings'), statusEl),
-            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/diary/` : `https://letterboxd.com/${u}/films/diary/page/${p}/`, parseLBDiary, t('diary'), statusEl),
-            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, t('watched'), statusEl),
-            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/likes/` : `https://letterboxd.com/${u}/likes/page/${p}/`, parseLBWatched, t('likes'), statusEl).catch(e => { console.error('[mrs] LB likes/films scrape failed:', e); return []; }),
+            settle(t('ratings'), scrape(chRatings, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings)),
+            settle(t('diary'), scrape(chDiary, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/diary/` : `https://letterboxd.com/${u}/films/diary/page/${p}/`, parseLBDiary)),
+            settle(t('watched'), scrape(chWatched, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched)),
+            settle(t('likes'), scrape(chLikes, (u, p) => p === 1 ? `https://letterboxd.com/${u}/likes/` : `https://letterboxd.com/${u}/likes/page/${p}/`, parseLBWatched)
+                .catch(e => { console.error('[mrs] LB likes scrape failed:', e); return []; })),
         ]);
+        setStatus(el, `${map.size} ${t('movies')}`, { current: 1, total: 1 });
+        void started;
 
         merge(ratings);
         merge(diary);
@@ -3539,17 +3704,25 @@
 
         // Fetch film details for films in parallel
         const uniqueItems = [...map.values()];
-        setStatus(statusEl, `Fetching film details for ${uniqueItems.length} films...` + dots());
+        setStatus(el, `Fetching film details: 0/${uniqueItems.length}`, { current: 0, total: uniqueItems.length });
         const lbRateLimit = makeRateLimiter(15);
-        const details = await asyncPool(25, uniqueItems, async i => {
-            if (!i.slug) return null;
-            const cacheKey = 'lb:' + i.slug;
-            const cached = filmDetailCache.get(cacheKey);
-            if (cached) return cached;
-            await lbRateLimit();
-            const result = await lbFetchFilmDetails(i.slug);
-            if (result) filmDetailCache.set(cacheKey, result);
-            return result;
+        let detailsDone = 0;
+        const details = await asyncPool(25, uniqueItems, async u => {
+            try {
+                if (!u.slug) return null;
+                const cacheKey = 'lb:' + u.slug;
+                const cached = filmDetailsCache.get(cacheKey);
+                if (cached) return cached;
+                await lbRateLimit();
+                const res = await lbFetchFilmDetails(u.slug);
+                if (res) filmDetailsCache.set(cacheKey, res);
+                return res;
+            } finally {
+                detailsDone++;
+                if (detailsDone % 5 === 0 || detailsDone === uniqueItems.length) {
+                    setStatus(el, `Fetching film details: ${detailsDone}/${uniqueItems.length}`, { current: detailsDone, total: uniqueItems.length });
+                }
+            }
         });
         details.forEach((r, i) => {
             const item = uniqueItems[i];
@@ -3871,9 +4044,11 @@
                 if (k && !byTitle.has(k)) byTitle.set(k, item.slug);
             }
         };
-        const rated = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, t('ratings'), statusEl, 200);
+        const rated = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, 200,
+            (done, total) => setStatus(statusEl, `${t('page')} ${done}/${total}`, { current: done, total }, t('ratings')));
         for (const item of rated) indexItem(item, item.rating ?? 'watched');
-        const watched = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, t('watchHistory'), statusEl, 200);
+        const watched = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, 200,
+            (done, total) => setStatus(statusEl, `${t('page')} ${done}/${total}`, { current: done, total }, t('watchHistory')));
         for (const item of watched) indexItem(item, 'watched');
         map.byTitle = byTitle;
         return map;
@@ -4126,6 +4301,19 @@
         .mrs-status__title{color:#111;font-weight:600;text-shadow:none;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
         .mrs-status__timer{margin-left:auto;color:#888;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:2px}
         .mrs-status__header--result{align-items:center;gap:8px;border-bottom:none}
+        .mrs-status__channels{display:flex;flex-direction:column;gap:4px;padding:0 22px 12px}
+        .mrs-status__row{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:12px;line-height:1.5}
+        .mrs-status__row-label{flex:0 0 auto;color:#111;font-weight:600;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .mrs-status__row-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .mrs-status__row-main{color:#555}
+        .mrs-status__row-meta{color:#9ca3af;font-variant-numeric:tabular-nums;margin-left:2px}
+        .mrs-status__row-mark{flex:0 0 auto;margin-left:auto;color:#10b981;font-weight:700}
+        .mrs-status__row--fail .mrs-status__row-mark{color:#e11d48}
+        .mrs-status__row--fail .mrs-status__row-main{color:#b91c1c}
+        .mrs-status__row--done .mrs-status__row-main{color:#4b5563}
+        .mrs-status__title-text{overflow-wrap:anywhere}
+        .mrs-status__title-timer{margin-left:8px;color:#9ca3af;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums}
+        @media (prefers-reduced-motion:reduce){.mrs-pulse{animation:none}}
         .mrs-status__progress{height:3px;background:rgba(0,0,0,0.04);border-radius:0 0 18px 18px;overflow:hidden}
         .mrs-status__progress-bar{height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:0 2px 2px 0;transition:width .3s ease;width:0%}
         .mrs-pulse{width:8px;height:8px;border-radius:50%;background:#3b82f6;animation:mrs-pulse 1.5s ease-in-out infinite;flex-shrink:0}
@@ -4219,6 +4407,9 @@
                 setDisabled(true);
                 buildUI._collapsePanel?.();
                 const exportStart = Date.now();
+                // Fresh card for every run, so rows from a previous export never
+                // linger and the user always sees exactly what is happening now.
+                clearStatus(statusEl);
                 try {
                     const csv = await mod.export(statusEl);
                     if (csv) {
