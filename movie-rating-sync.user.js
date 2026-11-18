@@ -4276,7 +4276,7 @@
             (document.head || document.documentElement).appendChild(s);
         };
     __mrsAddStyle(`
-        #mrs-wrap{all:initial;position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:normal;text-align:initial;direction:ltr;color:#111}
+        #mrs-wrap{--mrs-fg:#111;--mrs-fg-strong:#111;--mrs-muted:#6b7280;--mrs-meta:#9ca3af;--mrs-ok:#10b981;--mrs-fail:#e11d48;--mrs-fail-fg:#b91c1c;--mrs-done:#4b5563;--mrs-surface:#fff;--mrs-hairline:rgba(0,0,0,0.06);color-scheme:light;all:initial;position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:normal;text-align:initial;direction:ltr;color:var(--mrs-fg)}
         #mrs-wrap *{box-sizing:border-box}
         #mrs-panel{position:absolute;right:0;bottom:calc(100% + 12px);transform-origin:bottom right;background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;max-height:calc(100vh - 160px);overflow-y:auto;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
         #mrs-panel.mrs--visible{transform:scale(1) translateY(0);opacity:1;pointer-events:auto}
@@ -4294,25 +4294,26 @@
         .mrs-btn--danger{color:#e11d48;background:#fff}
         .mrs-btn--danger:hover{background:#fee2e2}
         .mrs-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
-        #mrs-status{all:initial;display:none;box-sizing:border-box;width:min(380px,calc(100vw - 48px));background:#fff;color:#111;border:1px solid rgba(0,0,0,0.10);border-radius:18px;font:400 13px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:left;direction:ltr;padding:0;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.16);animation:mrs-fade-in .3s ease}
-        #mrs-status *{box-sizing:border-box}
+        #mrs-status{all:initial;display:none;box-sizing:border-box;width:min(380px,calc(100vw - 48px));background:var(--mrs-surface);color:var(--mrs-fg);border:1px solid rgba(0,0,0,0.10);border-radius:18px;font:400 13px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:left;direction:ltr;color-scheme:light;padding:0;overflow:hidden;box-shadow:0 24px 64px rgba(15,23,42,0.28),0 2px 8px rgba(15,23,42,.12);isolation:isolate;animation:mrs-fade-in .3s ease}
+        #mrs-status *{box-sizing:border-box;text-shadow:none}
+        #mrs-status,#mrs-status span,#mrs-status div,#mrs-status button{color:var(--mrs-fg)}
         @keyframes mrs-fade-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-        .mrs-status__header{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.04);font-weight:600;color:#111;display:flex;align-items:flex-start;gap:10px}
-        .mrs-status__title{color:#111;font-weight:600;text-shadow:none;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
-        .mrs-status__timer{margin-left:auto;color:#888;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:2px}
+        .mrs-status__header{padding:14px 18px;border-bottom:1px solid var(--mrs-hairline);font-weight:600;color:var(--mrs-fg-strong);display:flex;align-items:flex-start;gap:10px}
+        .mrs-status__title{color:var(--mrs-fg-strong);font-weight:600;text-shadow:none;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+        .mrs-status__timer{margin-left:auto;color:var(--mrs-muted);font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:2px}
         .mrs-status__header--result{align-items:center;gap:8px;border-bottom:none}
-        .mrs-status__channels{display:flex;flex-direction:column;gap:4px;padding:0 22px 12px}
-        .mrs-status__row{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:12px;line-height:1.5}
-        .mrs-status__row-label{flex:0 0 auto;color:#111;font-weight:600;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .mrs-status__row-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .mrs-status__row-main{color:#555}
-        .mrs-status__row-meta{color:#9ca3af;font-variant-numeric:tabular-nums;margin-left:2px}
-        .mrs-status__row-mark{flex:0 0 auto;margin-left:auto;color:#10b981;font-weight:700}
-        .mrs-status__row--fail .mrs-status__row-mark{color:#e11d48}
-        .mrs-status__row--fail .mrs-status__row-main{color:#b91c1c}
-        .mrs-status__row--done .mrs-status__row-main{color:#4b5563}
-        .mrs-status__title-text{overflow-wrap:anywhere}
-        .mrs-status__title-timer{margin-left:8px;color:#9ca3af;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums}
+        .mrs-status__channels{display:flex;flex-direction:column;gap:4px;padding:0 22px 12px;color:var(--mrs-fg)}
+        .mrs-status__row{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:12px;line-height:1.5;color:var(--mrs-fg)}
+        .mrs-status__row-label{flex:0 0 auto;color:var(--mrs-fg-strong);font-weight:600;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .mrs-status__row-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mrs-fg)}
+        .mrs-status__row-main{color:var(--mrs-done)}
+        .mrs-status__row-meta{color:var(--mrs-meta);font-variant-numeric:tabular-nums;margin-left:2px}
+        .mrs-status__row-mark{flex:0 0 auto;margin-left:auto;color:var(--mrs-ok);font-weight:700}
+        .mrs-status__row--fail .mrs-status__row-mark{color:var(--mrs-fail)}
+        .mrs-status__row--fail .mrs-status__row-main{color:var(--mrs-fail-fg)}
+        .mrs-status__row--done .mrs-status__row-main{color:var(--mrs-done)}
+        .mrs-status__title-text{overflow-wrap:anywhere;color:inherit}
+        .mrs-status__title-timer{margin-left:8px;color:var(--mrs-meta);font-size:11px;font-weight:500;font-variant-numeric:tabular-nums}
         @media (prefers-reduced-motion:reduce){.mrs-pulse{animation:none}}
         .mrs-status__progress{height:3px;background:rgba(0,0,0,0.04);border-radius:0 0 18px 18px;overflow:hidden}
         .mrs-status__progress-bar{height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:0 2px 2px 0;transition:width .3s ease;width:0%}
