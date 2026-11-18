@@ -66,8 +66,11 @@ The extension ships the same engine as a native WebExtension, so it keeps workin
 * `powershell -File tools/make-icons.ps1` — regenerates `extension/icons/*` from `icon.png`.
 * `node tests/pure-functions.test.js` — pure-function unit tests.
 * `node tests/i18n.test.js` — translation key parity checks.
-* `node tests/extension-build.test.js` — checks the generated extension file still honours its GM_* shim and launcher icon.
+* `node tests/extension-build.test.js` - checks the generated extension file still honours its GM_* shim and launcher icon.
+* `node tests/title-key.test.js` - checks `titleKey()`, the lookup that lets a re-import skip films already on the profile without a network search.
 * Manual test guide: [`MANUAL_TEST_GUIDE.md`](MANUAL_TEST_GUIDE.md)
+
+**Import performance.** A re-import used to take ~12 minutes for 899 films because every film was searched on the network first and only then discarded as "already rated" (about 86% of the work). Both importers now build a `titleKey(title, year)` index from the existing profile and skip a film *before* searching. Keep that order in `runKPImportBatch` and `performLBImport`, and keep `fetchT` returning `null` on failure (retry logic depends on it).
 
 ---
 

@@ -1663,6 +1663,20 @@
         }
         const baseUrl = `https://www.kinopoisk.ru/user/${uid}/movies/voted-watched`;
         const map = new Map();
+        // Title index lets the importer recognise an already-rated film BEFORE
+        // paying for a network search — with 899 items that was most of the time.
+        const byTitle = new Map();
+        const indexItem = (item) => {
+            if (!item.kpId || map.has(item.kpId)) return;
+            map.set(item.kpId, item.rating != null ? item.rating : 'watched');
+            // Index every spelling we know: the profile page carries the Russian
+            // title while a CSV row may carry the original one, and a key that is
+            // missing here silently costs a network search.
+            for (const name of [item.titleRu, item.titleOrig, ...(item.allTitles || [])]) {
+                const k = titleKey(name, item.yearStart || item.year);
+                if (k && !byTitle.has(k)) byTitle.set(k, item.kpId);
+            }
+        };
         let totalPages = 0;
         // Fetch page 1 first to discover totalPages
         setStatus(statusEl, t('loadingExisting', { p: 1, total: '', count: 0 }) + dots());
@@ -1671,10 +1685,7 @@
             if (doc) {
                 const items = parseKPListingPage(doc);
                 if (!totalPages) totalPages = kpTotalPages(doc, items.length);
-                for (const item of items) {
-                    if (!item.kpId || map.has(item.kpId)) continue;
-                    map.set(item.kpId, item.rating != null ? item.rating : 'watched');
-                }
+                for (const item of items) indexItem(item);
             }
         }
 
@@ -1689,15 +1700,23 @@
             });
             for (const r of results) {
                 if (r.status === 'fulfilled' && r.value) {
-                    for (const item of r.value) {
-                        if (!item.kpId || map.has(item.kpId)) continue;
-                        map.set(item.kpId, item.rating != null ? item.rating : 'watched');
-                    }
+                    for (const item of r.value) indexItem(item);
                 }
             }
             setStatus(statusEl, t('loadingExisting', { p: totalPages, total: '/' + totalPages, count: map.size }));
         }
+        map.byTitle = byTitle;
         return map;
+    }
+
+    // Normalised title+year key used to match CSV rows against the existing list
+    // without hitting the search endpoint.
+    function titleKey(title, year) {
+        if (!title) return '';
+        const n = normTitle(title);
+        if (!n) return '';
+        const y = String(year || '').match(/\b(19|20)\d{2}\b/)?.[0] || '';
+        return y ? `${n}|${y}` : n;
     }
 
     async function runKPImportBatch(items, statusEl, mode, deep = false, opts = {}) {
@@ -1714,8 +1733,29 @@
             const slice = items.slice(cur, cur + kpGqlProbe.c);
             setStatus(statusEl, t('importProgress', { platform: 'Kinopoisk', from: cur + 1, to: Math.min(cur + kpGqlProbe.c, items.length), total: items.length }) + dots());
             const res = await asyncPool(kpGqlProbe.c, slice, async item => {
-                const kpResult = (item.kpId && /^\d+$/.test(item.kpId))
-                    ? { kpId: item.kpId, score: 1.0, confidence: 'high' }
+                const hasR0 = item.rating != null && +item.rating >= 1 && +item.rating <= 10;
+                const canSkip = mode === 'normal' && existing.size > 0;
+
+                // Fast path: if the film is already in the profile we can skip it
+                // WITHOUT a search. Checking the id first, then the title index,
+                // avoids a network round-trip for ~86% of a re-import.
+                let knownId = (item.kpId && /^\d+$/.test(item.kpId)) ? item.kpId : null;
+                if (!knownId && canSkip && existing.byTitle) {
+                    for (const name of [item.title, item.titleRu, item.titleOrig, ...(item.allTitles || [])]) {
+                        knownId = existing.byTitle.get(titleKey(name, item.year))
+                            || existing.byTitle.get(titleKey(name)); // year-less fallback
+                        if (knownId != null) break;
+                    }
+                }
+                if (knownId != null && existing.has(knownId)) {
+                    const ex = existing.get(knownId);
+                    if (mode === 'normal' && (ex !== 'watched' || !hasR0)) {
+                        if (opts.importFavorites && item.favorite) skippedFavIds.push(knownId);
+                        return 'skipped';
+                    }
+                }
+
+                const kpResult = knownId ? { kpId: knownId, score: 1.0, confidence: 'high' }
                     : await searchKPId(item.title, item.year, deep, item.allTitles);
                 if (!kpResult || kpResult.confidence === 'low') return 'notfound';
 
@@ -2998,12 +3038,22 @@
             const remaining = [];
             for (let p = startPage; p <= maxPages; p++) remaining.push(p);
             if (remaining.length > 0) {
-                setStatus(statusEl, `${label}: ${t('page')} ${startPage}-${maxPages} (${all.length} ${t('movies')})${dots()}`);
+                // Count finished pages and films as they arrive, so a long scan
+                // visibly moves instead of freezing on a static "page 4-200" line.
+                let donePages = 0;
+                let collected = 0;
+                const report = () => {
+                    setStatus(statusEl, `${label}: ${t('page')} ${donePages}/${remaining.length} \u00b7 ${collected} ${t('movies')}${dots()}`);
+                };
+                report();
                 const poolResults = await asyncPool(5, remaining, async (p) => {
                     const html = await fetchLBHtml(pathFn(username, p));
+                    const items = html ? parseFn(html) : null;
+                    donePages++;
+                    if (items?.length) collected += items.length;
+                    if (donePages % 3 === 0 || donePages === remaining.length) report();
                     if (!html) return null;
-                    const items = parseFn(html);
-                    if (!items.length) return null; // signal: no more pages
+                    if (!items?.length) return null; // signal: no more pages
                     return items;
                 });
                 for (const r of poolResults) {
@@ -3779,14 +3829,24 @@
             return new Map();
         }
         const map = new Map();
+        // Title index so the importer can recognise an already-rated film
+        // before spending a search request on it.
+        const byTitle = new Map();
+        const indexItem = (item, rating) => {
+            if (!item.slug) return;
+            if (!map.has(item.slug)) map.set(item.slug, rating);
+            // Index every known spelling so a title that differs from the page
+            // title still hits the fast path instead of falling through to search.
+            for (const name of [item.title, item.titleRu, item.titleOrig, ...(item.allTitles || [])]) {
+                const k = titleKey(name, item.year);
+                if (k && !byTitle.has(k)) byTitle.set(k, item.slug);
+            }
+        };
         const rated = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, t('ratings'), statusEl, 200);
-        for (const item of rated) {
-            if (item.slug) map.set(item.slug, item.rating ?? 'watched');
-        }
+        for (const item of rated) indexItem(item, item.rating ?? 'watched');
         const watched = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, t('watchHistory'), statusEl, 200);
-        for (const item of watched) {
-            if (item.slug && !map.has(item.slug)) map.set(item.slug, 'watched');
-        }
+        for (const item of watched) indexItem(item, 'watched');
+        map.byTitle = byTitle;
         return map;
     }
 
@@ -3800,6 +3860,10 @@
 
         // Phase 1: resolve slugs
         Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
+        // Load the existing profile FIRST: 773 of 899 films in a re-import are
+        // already rated, and resolving them by search was the bulk of the time.
+        setStatus(statusEl, mode === 'normal' && !deep ? t('checkingExisting') : t('startingImport') + dots());
+        const existing = mode === 'normal' && !deep ? await lbFetchRatings(statusEl) : new Map();
         setStatus(statusEl, t('resolveIdCount', { count: items.length }) + dots());
         const resolved = [];
         let cur = 0;
@@ -3809,6 +3873,22 @@
             setStatus(statusEl, t('resolveProgress', { from: cur + 1, to: Math.min(cur + lbProbe.c, items.length), total: items.length }) + dots(), { current: Math.min(cur + lbProbe.c, items.length), total: items.length });
             const t0 = Date.now();
             const res = await asyncPool(lbProbe.c, slice, i => {
+                // Fast path: already on the profile → no search needed at all.
+                if (mode === 'normal' && existing.size > 0 && existing.byTitle) {
+                    let knownSlug = null;
+                    for (const name of [i.title, i.titleRu, i.titleOrig, ...(i.allTitles || [])]) {
+                        knownSlug = existing.byTitle.get(titleKey(name, i.year))
+                            || existing.byTitle.get(titleKey(name));
+                        if (knownSlug != null) break;
+                    }
+                    if (knownSlug != null && existing.has(knownSlug)) {
+                        const ex = existing.get(knownSlug);
+                        const hasR = i.rating != null && String(i.rating) !== '' && +i.rating >= 1 && +i.rating <= 10;
+                        if (ex !== 'watched' || !hasR) {
+                            return Promise.resolve({ slug: knownSlug, filmId: null, lid: null, score: 1.0, confidence: 'high', filmIdKey: i.filmIdKey ?? null, ttIdKey: i.ttIdKey ?? null });
+                        }
+                    }
+                }
                 // Direct slug match (valid URL slug or film: ID)
                 if (i.lbSlug && !deep) {
                     // Handle film:ID format (resolved later) and tv:slug format (used directly)
@@ -3884,8 +3964,7 @@
 
         // Phase 2: apply
         Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
-        setStatus(statusEl, mode === 'normal' && !deep ? t('checkingExisting') : t('startingImport') + dots());
-        const existing = mode === 'normal' && !deep ? await lbFetchRatings(statusEl) : new Map();
+        // `existing` was loaded before phase 1 so that search could be skipped.
         let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0, favCount = 0;
         const missed = [];
         const toApply = resolved.filter(x => {
