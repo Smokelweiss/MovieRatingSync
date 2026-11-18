@@ -104,5 +104,19 @@ check(!/GM_info|GM_listValues/.test(code.replace(/\/\*[\s\S]*?\*\//g, '')), 'no 
 check(!code.includes("textContent: 'MRS'"), 'launcher no longer uses the MRS label');
 check(code.includes("'M20 12a8 8 0 0 1-13.66 5.66'"), 'launcher uses the cyclic-arrow SVG');
 
+// UI must not be restyled by the host page: the status card resets inherited
+// styles and must not rely on min-width (which overrides max-width) or on a
+// backdrop-filter/glow that turned the card unreadable on dark themes.
+const statusRule = code.match(/#mrs-status\{([^}]*)\}/)?.[1] ?? '';
+const titleRule = code.match(/\.mrs-status__title\{([^}]*)\}/)?.[1] ?? '';
+const panelRule = code.match(/#mrs-panel\{([^}]*)\}/)?.[0] ?? '';
+check(statusRule.includes('all:initial'), 'status card resets page-inherited styles');
+check(statusRule.indexOf('all:initial') === 0, 'all:initial is declared first so later longhands win');
+check(!/min-width/.test(statusRule), 'status card has no min-width fighting max-width');
+check(!/backdrop-filter/.test(statusRule), 'status card is opaque (no backdrop-filter)');
+check(!/text-shadow\s*:\s*(?!none)/.test(`x{${titleRule}}`), 'status title has no glow');
+check(/max-height/.test(panelRule), 'panel is height-capped');
+check(/bottom:calc\(100%/.test(panelRule), 'panel anchors above the status card, not over it');
+
 console.log(failures === 0 ? 'ALL OK' : failures + ' FAILURE(S)');
 process.exit(failures === 0 ? 0 : 1);
