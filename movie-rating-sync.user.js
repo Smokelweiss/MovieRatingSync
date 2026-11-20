@@ -2128,7 +2128,10 @@
                 else if (s === 'notfound') { notFound++; missed.push({ ...slice[j], error: t('errorNotFoundKP') }); }
                 else { failed++; missed.push({ ...slice[j], error: t('errorApi') }); fail++; }
             });
-            cur += kpGqlProbe.c;
+            // Advance by the size of the slice that actually ran: probeOk below
+            // may raise kpGqlProbe.c, and `cur += probe.c` then skipped films
+            // without ever searching or rating them.
+            cur = to;
             const elapsed = Date.now() - t0;
             // "Not found" is normal and must not shrink concurrency; only a
             // batch where most writes actually failed should slow us down.
@@ -2971,7 +2974,7 @@
                 else if (s === 'watched') w++;
                 else { fa++; missed.push({ ...item, error: t('errorApi') }); fail++; }
             });
-            cur += gqlProbe.c;
+            cur = to; // slice length, not the post-probe value: see kpApply
             const elapsed = Date.now() - t0;
             // Only a mostly-failing batch means the endpoint is overloaded; a
             // single rejected write must not cut concurrency for the rest of the run.
@@ -4190,6 +4193,76 @@
         });
     }
 
+    // One Letterboxd film page carries everything needed to write a rating:
+    // the slug (canonical / og:url), the rating LID and the numeric film id
+    // hidden in `production:identifier`. Shared by the slug lookup and the
+    // IMDb-id resolver so both parse the same page the same way.
+    function parseLBPageIds(html) {
+        if (!html) return null;
+        let filmId = null, lid = null;
+        const unescape = s => s.replace(/&quot;/g, '"');
+        const prodId = html.match(/name="production:identifier"\s+content="([^"]+)"/);
+        if (prodId) {
+            try {
+                const d = JSON.parse(unescape(prodId[1]));
+                if (d?.lid) lid = d.lid;
+                if (d?.uid) filmId = String(d.uid).replace(/^film:/, '');
+            } catch { /* malformed meta */ }
+        }
+        if (!filmId || !lid) {
+            const jsonId = html.match(/data-postered-identifier='([^']+)'/);
+            if (jsonId) {
+                try {
+                    const d = JSON.parse(unescape(jsonId[1]));
+                    if (!lid && d?.lid) lid = d.lid;
+                    if (!filmId && d?.uid) filmId = String(d.uid).replace(/^film:/, '');
+                } catch { /* malformed attribute */ }
+            }
+        }
+        if (!filmId) {
+            const fm = html.match(/data-film-id="(\d+)"/) || html.match(/\bfilm:(\d+)\b/);
+            if (fm) filmId = fm[1];
+        }
+        const slug = html.match(/<meta property="og:url" content="https:\/\/letterboxd\.com\/(?:film|tv)\/([^"/]+)\/"/)?.[1]
+            || html.match(/data-film-slug="([^"]+)"/)?.[1]
+            || null;
+        return (lid || filmId) ? { lid, filmId, slug } : null;
+    }
+
+    // Resolve a film by its IMDb id. Letterboxd redirects /imdb/tt…/ to the
+    // film page, so ONE request yields the slug + LID + film id. For an
+    // IMDb→Letterboxd import this replaces a title search (two autocomplete
+    // calls per spelling, up to three spellings, plus two HTML search pages
+    // when unsure) with a single exact lookup: measured 51 ms/film at 16
+    // concurrent from the shell.
+    async function lbResolveByImdbId(ttId, csrfRef) {
+        if (!ttId || !/^tt\d+$/.test(ttId)) return null;
+        const cacheKey = `lbImdb:${ttId}`;
+        const cached = searchCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+        const negTs = _lbNeg.get(cacheKey);
+        if (negTs && Date.now() - negTs < SEARCH_NEG_TTL) return null;
+        return dedupeFetch(cacheKey, async () => {
+            const html = await fetchLBHtml(`https://letterboxd.com/imdb/${ttId}/`);
+            if (!html) return null;
+            if (csrfRef) {
+                const csrfInPage = html.match(/supermodelCSRF\s*=\s*['"]([^'"]+)['"]/);
+                if (csrfInPage) csrfRef.val = csrfInPage[1];
+            }
+            const ids = parseLBPageIds(html);
+            if (!ids) {
+                // Letterboxd answers 200 with an ~80 KB page and no ids for a
+                // title it does not have; that is "not on LB", not a transport
+                // failure, so memoise it briefly instead of searching again.
+                _lbNeg.set(cacheKey, Date.now());
+                return null;
+            }
+            const result = { slug: ids.slug, filmId: ids.filmId, lid: ids.lid, score: 1.0, confidence: 'high' };
+            searchCache.set(cacheKey, result);
+            return result;
+        });
+    }
+
     // Read a film's internal ids from its page: LID (rating API) and numeric
     // film id (watch / rate / like form endpoints). One page fetch yields both,
     // and for a slug-only CSV row the numeric id is what enables "watched".
@@ -4203,32 +4276,6 @@
         const paths = !slug ? [`/film/${filmId}/`]
             : isTv ? [`/tv/${cleanSlug}/`]
                 : [`/film/${cleanSlug}/`, `/tv/${cleanSlug}/`];
-        const parseIds = html => {
-            let filmId = null, lid = null;
-            const prodId = html.match(/name="production:identifier"\s+content="([^"]+)"/);
-            if (prodId) {
-                try {
-                    const d = JSON.parse(prodId[1].replace(/&quot;/g, '"'));
-                    if (d?.lid) lid = d.lid;
-                    if (d?.uid) filmId = String(d.uid).replace(/^film:/, '');
-                } catch { /* malformed meta */ }
-            }
-            if (!filmId || !lid) {
-                const jsonId = html.match(/data-postered-identifier='(\{[^']+\})'/);
-                if (jsonId) {
-                    try {
-                        const d = JSON.parse(jsonId[1]);
-                        if (!lid && d?.lid) lid = d.lid;
-                        if (!filmId && d?.uid) filmId = String(d.uid).replace(/^film:/, '');
-                    } catch { /* malformed attribute */ }
-                }
-            }
-            if (!filmId) {
-                const fm = html.match(/data-film-id="(\d+)"/) || html.match(/\bfilm:(\d+)\b/);
-                if (fm) filmId = fm[1];
-            }
-            return (lid || filmId) ? { lid, filmId } : null;
-        };
         for (const path of paths) {
             try {
                 const html = await fetchLBHtml(`https://letterboxd.com${path}`);
@@ -4237,7 +4284,7 @@
                     const csrfInPage = html.match(/supermodelCSRF\s*=\s*['"]([^'"]+)['"]/);
                     if (csrfInPage) csrfRef.val = csrfInPage[1];
                 }
-                const ids = parseIds(html);
+                const ids = parseLBPageIds(html);
                 if (ids) return ids;
             } catch { continue; }
         }
@@ -4376,8 +4423,10 @@
                     if (attempt < 2) { await sleep(150 + attempt * 250); continue; }
                 }
                 if (r.status === 429) {
-                    const waitMs = 3000 + attempt * 3000;
-                    console.warn(`[mrs] LB 429: ${slug} — retry in ${waitMs}ms (attempt ${attempt + 1}/3)`);
+                    // A 429 here means Letterboxd is throttling a burst; the old
+                    // 3 s + 6 s ladder stalled an entire import behind one film.
+                    const waitMs = 900 + attempt * 900 + Math.floor(Math.random() * 300);
+                    DEBUG && console.warn(`[mrs] LB 429: ${slug} — retry in ${waitMs}ms (attempt ${attempt + 1}/3)`);
                     await sleep(waitMs);
                     continue;
                 }
@@ -4553,6 +4602,14 @@
                         return Promise.resolve({ slug: i.lbSlug, filmId: null, lid: null, score: 1.0, confidence: 'high' });
                     }
                 }
+                // Exact id → one page fetch, no title search at all. An IMDb
+                // CSV always carries TtId, so a 700-film IMDb→Letterboxd
+                // import no longer pays ~2–8 search requests per film.
+                // Series must stay on the search path: /imdb/tt…/ only maps
+                // films and answers "IMDb ID Not found" for a TV series.
+                if (i.ttId && /^tt\d+$/.test(i.ttId) && typeFamily(i.type) !== 'series') {
+                    return lbResolveByImdbId(i.ttId, csrfRef).then(r => r ?? lbSearchFilm(i.title, i.year, csrfRef, deep, i.allTitles, i));
+                }
                 return lbSearchFilm(i.title, i.year, csrfRef, deep, i.allTitles, i);
             });
             let miss = 0;
@@ -4566,7 +4623,7 @@
                     resolved.push({ item: slice[j], slug: found.slug, filmId: found.filmId, lid: found.lid });
                 }
             });
-            cur += lbProbe.c;
+            cur = to;
             const elapsed = Date.now() - t0;
             // An unresolved title is a normal outcome, not a network failure.
             // Treating every miss as one collapsed concurrency to MIN for the
@@ -4651,7 +4708,7 @@
                 else if (st === 'watched') watched++;
                 else { failed++; fail++; missed.push({ ...toApply[cur + j].item, error: t('errorApi') }); }
             });
-            cur += lbProbe.c;
+            cur = to;
             // A rejected write is a normal outcome (bad match, taken down film);
             // only a mostly-failing batch means the endpoint is pushing back.
             fail / slice.length >= 0.5 ? probeFail(lbProbe) : probeOk(lbProbe, Date.now() - t0);
