@@ -2988,7 +2988,7 @@
 
         // Fetch film details (titles + extended metadata) from IMDb film pages
         const uniqueItems = [...itemMap.values()];
-        setStatus(el, t('fetchingLid', { count: uniqueItems.length }), { current: 0, total: uniqueItems.length });
+        setStatus(statusEl, t('fetchingLid', { count: uniqueItems.length }), { current: 0, total: uniqueItems.length });
         const imdbRateLimit = makeRateLimiter(15);
         const titleResults = await asyncPool(25, uniqueItems, async i => {
             if (!i.ttId) return null;
@@ -3718,11 +3718,11 @@
             try {
                 if (!u.slug) return null;
                 const cacheKey = 'lb:' + u.slug;
-                const cached = filmDetailsCache.get(cacheKey);
+                const cached = filmDetailCache.get(cacheKey);
                 if (cached) return cached;
                 await lbRateLimit();
                 const res = await lbFetchFilmDetails(u.slug);
-                if (res) filmDetailsCache.set(cacheKey, res);
+                if (res) filmDetailCache.set(cacheKey, res);
                 return res;
             } finally {
                 detailsDone++;
