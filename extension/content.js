@@ -4238,15 +4238,11 @@
 
     // ====================== UI ======================
 
-    // GM_addStyle fallback — some managers don't define it, which would crash the entire script
-    const __mrsAddStyle = typeof GM_addStyle === 'function'
-        ? GM_addStyle
-        : (css) => {
-            const s = document.createElement('style');
-            s.textContent = css;
-            (document.head || document.documentElement).appendChild(s);
-        };
-    __mrsAddStyle(`
+    // The stylesheet lives in this constant and is injected by buildUI into the
+    // widget's own root (see UI isolation below). It is not added to the page's
+    // <head>: document-level rules are the ones host pages and userstyles could
+    // outrank.
+    const __mrsUiCss = `
         #mrs-wrap{--mrs-fg:#111;--mrs-fg-strong:#111;--mrs-muted:#6b7280;--mrs-meta:#9ca3af;--mrs-ok:#10b981;--mrs-fail:#e11d48;--mrs-fail-fg:#b91c1c;--mrs-done:#4b5563;--mrs-surface:#fff;--mrs-hairline:rgba(0,0,0,0.06);color-scheme:light;all:initial;position:fixed;bottom:24px;right:24px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:normal;text-align:initial;direction:ltr;color:var(--mrs-fg)}
         #mrs-wrap *{box-sizing:border-box}
         #mrs-panel{position:absolute;right:0;bottom:calc(100% + 12px);transform-origin:bottom right;background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.02);padding:4px;display:flex;flex-direction:column;gap:0;max-height:calc(100vh - 160px);overflow-y:auto;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease;transform:scale(.95) translateY(10px);opacity:0;pointer-events:none}
@@ -4303,7 +4299,80 @@
         .mrs-lang-select{flex:1;padding:4px 8px;border:1px solid rgba(0,0,0,0.1);border-radius:8px;font-size:12px;background:#fff;color:#333;cursor:pointer;outline:none;transition:border-color .15s}
         .mrs-lang-select:hover{border-color:rgba(59,130,246,0.5)}
         .mrs-lang-select:focus{border-color:#3b82f6}
-    `);
+    `;
+
+
+    // ---------------------------------------------------------------
+    // UI isolation
+    //
+    // Host-page rules, theme extensions and other userscripts can outrank a
+    // plain document-level style element ("chrome::" / "x-..." rules, inverting
+    // dark-mode filters, Stylus themes). When they do, the status card keeps its
+    // layout but loses its background and text colour -- the "dark panel with
+    // invisible text" report.
+    //
+    // Fix: the widget is built inside its own shadow root (or, when shadow DOM
+    // is unavailable, a transparent floating document), so page and userstyle
+    // selectors can never match #mrs-wrap, #mrs-panel or #mrs-status.
+    // ---------------------------------------------------------------
+    const __mrsShield = '#mrs-wrap{all:initial !important;position:fixed !important;bottom:24px !important;right:24px !important;'
+        + 'z-index:2147483647 !important;display:flex !important;flex-direction:column !important;align-items:flex-end !important;'
+        + 'gap:12px !important;box-sizing:border-box !important;filter:none !important;opacity:1 !important;visibility:visible !important}'
+        + '#mrs-wrap *{text-shadow:none !important}';
+    // Hosts the page CSS can never reach, so no shield rules are needed inside.
+    const __mrsHostCss = ':host{all:initial;position:fixed!important;bottom:0!important;right:0!important;width:0!important;height:0!important;'
+        + 'display:block!important;pointer-events:none}'
+        + '#mrs-wrap>*{pointer-events:auto}';
+    const __mrsCreateUIRoot = (css) => {
+        const frag = document.createDocumentFragment();
+        // 1) shadow DOM: strongest isolation, ids stay queryable from the document.
+        try {
+            const host = document.createElement('div');
+            host.id = 'mrs-shadow-host';
+            host.style.cssText = 'all:initial;position:fixed;bottom:0;right:0;width:0;height:0;display:block';
+            const root = host.attachShadow({ mode: 'open' });
+            const sheet = document.createElement('style');
+            sheet.textContent = [css, __mrsShield, __mrsHostCss].join('\n');
+            root.appendChild(sheet);
+            root.appendChild(frag);
+            return { frag, root, host, css };
+        } catch (e) {
+            DEBUG && console.warn('[mrs] shadow DOM unavailable, using a wrapper document:', e && e.message);
+        }
+        // 2) fallback: a transparent floating document of our own.
+        const frame = document.createElement('iframe');
+        frame.id = 'mrs-frame-host';
+        frame.style.cssText = __mrsShield;
+        frag.appendChild(frame);
+        return { frag, root: null, host: frame, css };
+    };
+    const __mrsPopulate = (uiRoot, wrap) => {
+        // The host must be in the document first, and the widget goes INSIDE the
+        // shadow root. Appending the fragment to document.body drains it out of
+        // the root and drops #mrs-wrap into the page, which loses every
+        // position:absolute relation in #mrs-panel.
+        if (uiRoot.root) {
+            document.body.appendChild(uiRoot.host);
+            uiRoot.frag.appendChild(wrap);
+            uiRoot.root.appendChild(uiRoot.frag);
+            return;
+        }
+        const doc = uiRoot.host.contentDocument;
+        doc.open();
+        doc.write('<!doctype html><html><head></head><body></body></html>');
+        doc.close();
+        const sheet = doc.createElement('style');
+        sheet.textContent = [uiRoot.css, __mrsShield].join('\n')
+            + 'html,body{margin:0;padding:0;background:transparent;overflow:hidden}';
+        doc.head.appendChild(sheet);
+        document.body.appendChild(uiRoot.host);
+        doc.body.appendChild(wrap);
+    };
+    const __mrsCleanupRoot = () => {
+        for (const n of [document.getElementById('mrs-shadow-host'), document.getElementById('mrs-frame-host')]) {
+            if (n) n.remove();
+        }
+    };
 
     let _mrsBuilding = false;
     function buildUI() {
@@ -4315,7 +4384,6 @@
         if (!document.body) { console.warn('[mrs] document.body not ready, deferring buildUI'); return false; }
         _mrsBuilding = true;
         try {
-            const frag = document.createDocumentFragment();
             const wrap = document.createElement('div');
             wrap.id = 'mrs-wrap';
 
@@ -4467,24 +4535,38 @@
             DEBUG && console.log('[mrs] buildUI: panel children count after append=', panel.childNodes.length);
             wrap.appendChild(panel);
             wrap.appendChild(launcher);
-            frag.appendChild(wrap);
-            document.body.appendChild(frag);
 
-            // Close on any click outside the widget (e.g. opening the profile menu).
-            if (buildUI._onDocPointerDown) document.removeEventListener('pointerdown', buildUI._onDocPointerDown, true);
-            buildUI._onDocPointerDown = (e) => {
-                if (!panel.classList.contains('mrs--visible')) return;
-                if (wrap.contains(e.target)) return;
-                setPanelOpen(false);
+            // Mount the widget in an isolated root so host-page and userstyle
+            // rules -- including "chrome::" and inverted-dark filters -- cannot
+            // restyle it. See UI isolation above.
+            __mrsCleanupRoot();
+            const uiRoot = __mrsCreateUIRoot(__mrsUiCss);
+            __mrsPopulate(uiRoot, wrap);
+            buildUI._host = uiRoot.host;
+
+            // Close on any click outside the widget.
+            // The widget lives in its own shadow root, so document-level listeners
+            // only ever see the (zero-size) host: every widget click would look
+            // "outside" and close the panel on the same tick it opened. Instead the
+            // <html> element is watched WITHOUT capture: events that started inside
+            // the root never reach it, events from the page do.
+            if (buildUI._onHtmlClick) document.documentElement.removeEventListener('pointerdown', buildUI._onHtmlClick);
+            buildUI._onHtmlClick = () => {
+                if (panel.classList.contains('mrs--visible')) setPanelOpen(false);
             };
-            document.addEventListener('pointerdown', buildUI._onDocPointerDown, true);
+            document.documentElement.addEventListener('pointerdown', buildUI._onHtmlClick, false);
 
-            // Collapse the panel when an action starts or the site UI is used.
-            buildUI._collapsePanel = () => setPanelOpen(false);
+            DEBUG && console.log('[mrs] buildUI: widget mounted', {
+                shadow: !!uiRoot.root,
+                panelChildren: panel.childNodes.length,
+            });
         } catch (e) {
             console.error('[mrs] buildUI failed:', e);
+            // A half-built widget must not survive and block the retry that
+            // recheck() schedules below (buildUI bails out when #mrs-wrap exists).
+            __mrsCleanupRoot();
             const partial = document.getElementById('mrs-wrap');
-            if (partial) partial.remove();
+            if (partial && !partial.closest('#mrs-shadow-host')) partial.remove();
         } finally {
             _mrsBuilding = false;
         }

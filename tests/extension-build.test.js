@@ -31,11 +31,25 @@ const noop = () => {};
 const fakeEl = () => ({
     style: {}, dataset: {}, classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
     children: [], childNodes: [],
+    // Real DOM nodes always expose these, and the UI root factory relies on them.
     setAttribute: noop, removeAttribute: noop, getAttribute: () => null, hasAttribute: () => false,
     appendChild: (c) => c, removeChild: (c) => c, insertBefore: (c) => c, replaceChild: (c) => c,
     addEventListener: noop, removeEventListener: noop, remove: noop, click: noop, focus: noop,
     querySelector: () => null, querySelectorAll: () => [], closest: () => null, contains: () => false,
     insertAdjacentHTML: noop, insertionStyle: undefined, textContent: '', innerHTML: '',
+    // Shadow DOM / floating-document host: the UI root factory clones the real
+    // APIs of a DOM node, which a bare stub would silently skip.
+    attachShadow: function () {
+        return { appendChild: (c) => c, elementsFromPoint: () => [] };
+    },
+    get contentDocument() {
+        const doc = {
+            open: noop, close: noop, write: noop,
+            head: fakeEl(), body: fakeEl(),
+            createElement: fakeEl,
+        };
+        return doc;
+    },
 });
 const sandbox = {
     console: { log: (...a) => messages.push(a.join(' ')), warn: (...a) => messages.push(a.join(' ')),
@@ -117,6 +131,16 @@ check(!/backdrop-filter/.test(statusRule), 'status card is opaque (no backdrop-f
 check(!/text-shadow\s*:\s*(?!none)/.test(`x{${titleRule}}`), 'status title has no glow');
 check(/max-height/.test(panelRule), 'panel is height-capped');
 check(/bottom:calc\(100%/.test(panelRule), 'panel anchors above the status card, not over it');
+// The sheet must be sealed inside the widget root, not dropped in <head> where
+// host-page and userstyle rules can outrank it.
+check(code.includes('__mrsCreateUIRoot'), 'UI is mounted in an isolated root');
+check(!/__mrsAddStyle\(/.test(code), 'no document-level style injection');
+check(code.includes('attachShadow'), 'shadow root is used when available');
+check(code.includes('__mrsShield'), 'wrapper keeps its fixed position even if page CSS leaks');
+// The widget must be appended INSIDE the shadow root; appending the fragment
+// to document.body drains it out of the root and breaks panel positioning.
+check(!/document\.body\.appendChild\(uiRoot\.frag\)/.test(code), 'widget fragment is never drained into the page');
+check(/document\.body\.appendChild\(uiRoot\.host\);[\s\S]{0,200}uiRoot\.root\.appendChild\(uiRoot\.frag\)/.test(code), 'host is in the document before the widget enters its root');
 
 console.log(failures === 0 ? 'ALL OK' : failures + ' FAILURE(S)');
 process.exit(failures === 0 ? 0 : 1);
