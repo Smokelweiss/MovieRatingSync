@@ -2076,6 +2076,9 @@
             const slice = items.slice(cur, cur + kpGqlProbe.c);
             const to = Math.min(cur + kpGqlProbe.c, items.length);
             chApply(`${cur + 1}–${to}/${items.length}`, { current: to, total: items.length, extra: `${rated} ${t('rated')}` });
+            // Measure the batch itself: taking t0 AFTER the pool made every
+            // elapsed value ~0 ms, so probeOk judged latency from noise.
+            const t0 = Date.now();
             const res = await asyncPool(kpGqlProbe.c, slice, async item => {
                 const hasR0 = item.rating != null && +item.rating >= 1 && +item.rating <= 10;
                 const canSkip = mode === 'normal' && existing.size > 0;
@@ -2118,7 +2121,6 @@
                 }
                 return appResult ?? 'failed';
             });
-            const t0 = Date.now();
             let fail = 0;
             res.forEach((r, j) => {
                 const s = r.status === 'fulfilled' ? r.value : 'failed';
@@ -4637,13 +4639,33 @@
         // written directly through /s/film:{id}/rate/ and /watch/, so fetching
         // the film page just to learn its slug was one wasted request per row.
 
-        // Pre-fetch missing ids in parallel before the apply phase. Search
-        // results already carry filmId + lid; only CSV rows that arrived with a
-        // bare slug need the page lookup, and one fetch now yields both ids.
-        // A watched-only row always needs filmId (rating can go through the LID),
-        // and so does a favorite: likes are only writable through the form
-        // endpoint, which takes the numeric id.
-        const needLid = resolved.filter(x => {
+        // Decide what will actually be written BEFORE fetching any page ids:
+        // `toApply` drops already-rated rows, and collecting ids for them was
+        // one wasted film-page request per skipped movie (hundreds on a re-import).
+        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0;
+        const missed = [];
+        const toApply = resolved.filter(x => {
+            // An item is only truly unresolved when it has neither a slug nor an
+            // internal film id. A failed slug lookup must not discard a rating
+            // that can be written through /s/film:{id}/rate/.
+            if (!x.slug && !x.filmId) {
+                notFound++; missed.push({ ...x.item, error: t('errorNotFoundLB') }); return false;
+            }
+            const hasR = x.item.rating != null && String(x.item.rating) !== '' && +x.item.rating >= 1 && +x.item.rating <= 10;
+            // A row known only by its internal id still matches the profile index
+            // when that index was built from a listing without slugs.
+            const ex = existing.get(x.slug) ?? (x.filmId ? existing.get('film:' + x.filmId) : undefined);
+            if (mode === 'normal' && ex != null && (ex !== 'watched' || !hasR)) { skipped++; return false; }
+            return true;
+        });
+        DEBUG && console.log(`[mrs] LB PHASE SUMMARY: CSV parsed=${items.length} resolved=${resolved.length} withSlug=${toApply.length} noSlug=${notFound} skipped=${skipped}`);
+
+        // Pre-fetch missing ids for the rows that WILL be written. Search
+        // results already carry filmId + lid; a bare slug needs one page
+        // lookup, which yields both. A watched-only row always needs filmId
+        // (rating can go through the LID), and so does a favorite: likes are
+        // only writable through the form endpoint, which takes the numeric id.
+        const needLid = toApply.filter(x => {
             if (!x.slug || x.filmId) return false;
             if (!x.lid) return true;
             const hasR = x.item.rating != null && String(x.item.rating) !== '' && +x.item.rating >= 1 && +x.item.rating <= 10;
@@ -4673,24 +4695,8 @@
 
         // Phase 2: apply
         Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
-        // `existing` was loaded before phase 1 so that search could be skipped.
-        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0;
-        const missed = [];
-        const toApply = resolved.filter(x => {
-            // An item is only truly unresolved when it has neither a slug nor an
-            // internal film id. A failed slug lookup must not discard a rating
-            // that can be written through /s/film:{id}/rate/.
-            if (!x.slug && !x.filmId) {
-                notFound++; missed.push({ ...x.item, error: t('errorNotFoundLB') }); return false;
-            }
-            const hasR = x.item.rating != null && String(x.item.rating) !== '' && +x.item.rating >= 1 && +x.item.rating <= 10;
-            // A row known only by its internal id still matches the profile index
-            // when that index was built from a listing without slugs.
-            const ex = existing.get(x.slug) ?? (x.filmId ? existing.get('film:' + x.filmId) : undefined);
-            if (mode === 'normal' && ex != null && (ex !== 'watched' || !hasR)) { skipped++; return false; }
-            return true;
-        });
-        DEBUG && console.log(`[mrs] LB PHASE SUMMARY: CSV parsed=${items.length} resolved=${resolved.length} withSlug=${toApply.length} noSlug=${notFound} skipped=${skipped}`);
+        // `existing` was loaded before phase 1 so that search could be skipped,
+        // and `toApply` was decided before the id prefetch for the same reason.
 
         cur = 0;
         let favorites = 0;

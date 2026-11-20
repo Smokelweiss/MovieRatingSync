@@ -84,6 +84,31 @@ const floored = api.makeProbe(5, 200);
 api.probeFail(floored);
 check('probeFail never goes below MIN', floored.c === 5, `c=${floored.c}`);
 
+// --- 5. Latency fed to probeOk must be measured AROUND the pool -------------
+// kpApply used to take `const t0 = Date.now()` *after* `await asyncPool(...)`,
+// so `elapsed` was 0–2 ms. probeOk then compared millisecond noise, grew or
+// shrank concurrency at random, and never saw the endpoint's real response
+// time. A clock sitting immediately after the pool is that bug.
+const lines = raw.split('\n');
+const timingBugs = [];
+for (let i = 0; i < lines.length; i += 1) {
+  if (!/await asyncPool\(/.test(lines[i])) continue;
+  // The pool statement ends at the first line that closes it with `});`.
+  let end = i;
+  while (end < lines.length && !/^\s*\}\s*\)\s*;/.test(lines[end])) end += 1;
+  for (let j = end + 1; j < Math.min(end + 4, lines.length); j += 1) {
+    if (/const t0 = Date\.now\(\);/.test(lines[j])) {
+      timingBugs.push(`${j + 1}: clock starts after the pool it times`);
+      break;
+    }
+  }
+}
+check(
+  'probe latency clock starts before the awaited pool',
+  timingBugs.length === 0,
+  timingBugs.join(' | ')
+);
+
 console.log('');
 console.log(failures.length ? `CONCURRENCY PROBE FAILED (${failures.length})` : 'CONCURRENCY PROBE ALL OK');
 process.exit(failures.length ? 1 : 0);
