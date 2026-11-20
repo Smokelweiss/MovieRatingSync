@@ -4650,14 +4650,18 @@
             return origFetch.call(window, input, init);
         };
 
-        // Add click listener on the page to help detect favorite button clicks
-        document.addEventListener('click', function mrsFavClick(e) {
+        // Add click listener on the page to help detect favorite button clicks.
+        // Declared as a const: the named function expression used to be scoped to
+        // itself, so removeEventListener below could never actually detach it.
+        const mrsFavClick = (e) => {
             const target = e.target;
+            if (!target || typeof target.closest !== 'function') return;
             const isFavBtn = target.closest('[class*="favorite"], [class*="favourite"], [aria-label*="favorite"], [aria-label*="избран"], button[class*="heart"], a[class*="heart"], svg[class*="heart"]');
             if (isFavBtn) {
                 DEBUG && console.log(`%c[mrs-diag] 🖱️ Favorite button clicked! Check XHR/fetch logs above.`, 'font-size:13px;font-weight:bold;color:#ef4444');
             }
-        }, true);
+        };
+        document.addEventListener('click', mrsFavClick, true);
 
         DEBUG && console.log(`%c[mrs-diag] ✅ Diagnostic active!`, 'font-size:16px;font-weight:bold;color:#22c55e');
         DEBUG && console.log(`%c[mrs-diag] Instructions:`, 'font-weight:bold');
