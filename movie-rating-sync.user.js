@@ -50,14 +50,18 @@
     };
 
     const CONCURRENCY = { INIT: 20, MAX: 200, UP: 10, DOWN: 5, MIN: 5 };
-    const PLATFORM_MAX = { kp: 50, kpGql: 50, imdb: 200, lb: 50 };
+    // kpGql is capped at 24 on purpose: measured with 40 concurrent Suggest
+    // requests, anything above ~24 in flight starts returning HTML 403 pages
+    // (Kinopoisk anti-fraud), and every 403 costs a retry round-trip plus the
+    // delay multiplier, so higher "concurrency" is strictly slower.
+    const PLATFORM_MAX = { kp: 50, kpGql: 24, imdb: 200, lb: 50 };
     const RETRY = { FETCH: 3, GQL: 3, PAGES: 100 };
     const YEAR_TOL = 1;
     const KP_GQL = 'https://graphql.kinopoisk.ru/graphql/';
 
     // ====================== I18N ======================
 
-    const TRANSLATIONS = { en: { time: 'Time', exportRatings: '📤 Export Ratings', importRatings: '📥 Import', hardImport: '🔄 Hard Import', loadingPage: 'Loading page {p}{total} ({count} movies)', kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed', kpListingFailed: 'Failed to load Kinopoisk listing', profileDetect: 'Detecting {platform} profile', loadedRecords: 'Loaded {count} records. {next}', checkingExisting: 'Checking existing ratings...', startingImport: 'Starting import...', importProgress: 'Import to {platform} {from}–{to}/{total}', searchProgress: 'Search {from}–{to}/{total}', resolveProgress: 'Resolving {from}–{to}/{total}', resolveIdCount: 'Resolving IDs: {count} movies', fetchingLid: 'Fetching LID: {count} movies', applyProgress: 'Applying {from}–{to}/{total}', loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)', deepSearch: 'Deep search {platform}', scanHistory: 'Scanning {platform} history', foundCount: 'Found: {count} movies. Generating CSV', userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped', ratings: 'Ratings', watchHistory: 'Watch history', diary: 'Diary', watched: 'Watched', page: 'page', kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page', imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account', lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile', csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account', csvEmpty: '❌ CSV is empty or not recognized', done: '✅ Done{mode}!', replaceMode: ' (replace mode)', rated: 'Rated: ', watchedShort: 'Watched: ', skipped: 'Skipped: ', notFound: 'Not found: ', failed: 'Errors: ', errorNotFoundKP: 'Not found on Kinopoisk', errorNotFoundIMDb: 'Not found on IMDb', errorNotFoundLB: 'Not found on Letterboxd', errorApi: 'API error / network failure', allImported: '🎉 All records imported!', exportDone: '✅ Export complete! File saved.', deepSearchBtn: '🔍 Deep search ({count})', movies: 'movies', favorites: 'Favorites: ', likes: 'Likes', importFavorites: 'Import favorites', language: 'Language', exportHint: 'Download all your ratings from this platform as a CSV file', importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added', hardImportHint: 'Import from CSV and overwrite existing ratings (normal mode skips already-rated films)', importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list', runtime: 'Runtime', directors: 'Directors', actors: 'Actors', premiereDate: 'Premiere date', languageHint: 'Select the interface language', imdbNoData: 'No ratings or watch history found — make sure you are logged in and have rated films on IMDb', }, ru: { time: 'Время', exportRatings: '📤 Экспорт оценок', importRatings: '📥 Импорт', hardImport: '🔄 Полная замена', loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)', kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали', kpListingFailed: 'Не удалось загрузить листинг КП', profileDetect: 'Определяем профиль {platform}', loadedRecords: 'Загружено {count} записей. {next}', checkingExisting: 'Проверяем существующие оценки...', startingImport: 'Начинаем импорт...', importProgress: 'Импорт на {platform} {from}–{to}/{total}', searchProgress: 'Поиск {from}–{to}/{total}', resolveProgress: 'Резолвинг {from}–{to}/{total}', resolveIdCount: 'Резолвинг ID: {count} фильмов', fetchingLid: 'Получение LID: {count} фильмов', applyProgress: 'Применение {from}–{to}/{total}', loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)', deepSearch: 'Глубокий поиск {platform}', scanHistory: 'Сканируем историю {platform}', foundCount: 'Найдено: {count} фильмов. Формируем CSV', userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены', ratings: 'Оценки', watchHistory: 'Просмотры', diary: 'Дневник', watched: 'Просмотрено', page: 'стр.', kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП', imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт', lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль', csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd', csvEmpty: '❌ CSV пуст или не распознан', done: '✅ Готово{mode}!', replaceMode: ' (режим замены)', rated: 'Оценено: ', watchedShort: 'Просмотрено: ', skipped: 'Пропущено: ', notFound: 'Не найдено: ', failed: 'Ошибок: ', errorNotFoundKP: 'Не найдено на Кинопоиске', errorNotFoundIMDb: 'Не найдено на IMDb', errorNotFoundLB: 'Не найдено на Letterboxd', errorApi: 'Ошибка API / сетевой сбой', allImported: '🎉 Все записи импортированы!', exportDone: '✅ Экспорт завершён! Файл сохранён.', deepSearchBtn: '🔍 Искать глубже ({count})', movies: 'фильмов', favorites: 'Избранное: ', likes: 'Лайки', importFavorites: 'Импортировать избранное', language: 'Язык', exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл', importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются', hardImportHint: 'Импорт из CSV с перезаписью существующих оценок (обычный режим пропускает уже оценённые фильмы)', importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного', runtime: 'Длительность', directors: 'Режиссёры', actors: 'Актёры', premiereDate: 'Дата премьеры', languageHint: 'Выбор языка интерфейса', imdbNoData: 'Нет оценок или истории просмотров — убедитесь, что вы вошли в аккаунт и оценили фильмы на IMDb', }, es: { time: 'Tiempo', exportRatings: '📤 Exportar valoraciones', importRatings: '📥 Importar', hardImport: '🔄 Importación forzada', loadingPage: 'Cargando pág. {p}{total} ({count} películas)', kpParseFailed: 'Error al analizar el listado de Kinopoisk', kpListingFailed: 'Error al cargar el listado de Kinopoisk', profileDetect: 'Detectando perfil de {platform}', loadedRecords: 'Cargados {count} registros. {next}', checkingExisting: 'Comprobando valoraciones existentes...', startingImport: 'Iniciando importación...', importProgress: 'Importando a {platform} {from}–{to}/{total}', searchProgress: 'Buscando {from}–{to}/{total}', resolveProgress: 'Resolviendo {from}–{to}/{total}', resolveIdCount: 'Resolviendo IDs: {count} películas', fetchingLid: 'Obteniendo LID: {count} películas', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)', deepSearch: 'Búsqueda profunda {platform}', scanHistory: 'Escaneando historial de {platform}', foundCount: 'Encontradas: {count} películas. Generando CSV', userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes', ratings: 'Valoraciones', watchHistory: 'Historial', diary: 'Diario', watched: 'Visto', page: 'página', kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk', imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión', lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil', csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd', csvEmpty: '❌ CSV vacío o no reconocido', done: '✅ ¡Listo{mode}!', replaceMode: ' (modo reemplazo)', rated: 'Valorado: ', watchedShort: 'Visto: ', skipped: 'Omitido: ', notFound: 'No encontrado: ', failed: 'Errores: ', errorNotFoundKP: 'No encontrado en Kinopoisk', errorNotFoundIMDb: 'No encontrado en IMDb', errorNotFoundLB: 'No encontrado en Letterboxd', errorApi: 'Error de API / fallo de red', allImported: '🎉 ¡Todos los registros importados!', exportDone: '✅ ¡Exportación completa! Archivo guardado.', deepSearchBtn: '🔍 Búsqueda profunda ({count})', movies: 'películas', favorites: 'Favoritos: ', likes: 'Me gusta', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV', importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden', hardImportHint: 'Importa desde CSV y sobrescribe las valoraciones existentes', importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista', runtime: 'Duración', directors: 'Directores', actors: 'Actores', premiereDate: 'Fecha de estreno', languageHint: 'Selecciona el idioma de la interfaz', imdbNoData: 'No se encontraron valoraciones ni historial — inicia sesión y valora películas en IMDb', }, fr: { time: 'Temps', exportRatings: '📤 Exporter les notes', importRatings: '📥 Importer', hardImport: '🔄 Importation forcée', loadingPage: 'Chargement p. {p}{total} ({count} films)', kpParseFailed: "Échec de l'analyse du listing Kinopoisk", kpListingFailed: 'Échec du chargement du listing Kinopoisk', profileDetect: 'Détection du profil {platform}', loadedRecords: '{count} enregistrements chargés. {next}', checkingExisting: 'Vérification des notes existantes...', startingImport: "Démarrage de l'importation...", importProgress: 'Importation vers {platform} {from}–{to}/{total}', searchProgress: 'Recherche {from}–{to}/{total}', resolveProgress: 'Résolution {from}–{to}/{total}', resolveIdCount: 'Résolution des IDs: {count} films', fetchingLid: 'Récupération LID: {count} films', applyProgress: 'Application {from}–{to}/{total}', loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)', deepSearch: 'Recherche approfondie {platform}', scanHistory: "Analyse de l'historique {platform}", foundCount: 'Trouvés: {count} films. Génération CSV', userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées', ratings: 'Notes', watchHistory: 'Historique', diary: 'Journal', watched: 'Vu', page: 'page', kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk', imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous', lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil', csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd', csvEmpty: '❌ CSV vide ou non reconnu', done: '✅ Terminé{mode}!', replaceMode: ' (mode remplacement)', rated: 'Noté: ', watchedShort: 'Vu: ', skipped: 'Ignoré: ', notFound: 'Introuvable: ', failed: 'Erreurs: ', errorNotFoundKP: 'Non trouvé sur Kinopoisk', errorNotFoundIMDb: 'Non trouvé sur IMDb', errorNotFoundLB: 'Non trouvé sur Letterboxd', errorApi: 'Erreur API / problème réseau', allImported: '🎉 Tous les enregistrements importés!', exportDone: '✅ Export terminé! Fichier sauvegardé.', deepSearchBtn: '🔍 Recherche approfondie ({count})', movies: 'films', favorites: 'Favoris: ', likes: 'J\'aime', importFavorites: 'Importer les favoris', language: 'Langue', exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV', importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées', hardImportHint: 'Importe depuis CSV et écrase les notes existantes', importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris', runtime: 'Durée', directors: 'Réalisateurs', actors: 'Acteurs', premiereDate: 'Date de sortie', languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera', imdbNoData: 'Aucune note ni historique trouvé — connectez-vous et notez des films sur IMDb', }, de: { time: 'Zeit', exportRatings: '📤 Bewertungen exportieren', importRatings: '📥 Importieren', hardImport: '🔄 Hartimport', loadingPage: 'Lade Seite {p}{total} ({count} Filme)', kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden', kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden', profileDetect: 'Erkenne {platform}-Profil', loadedRecords: '{count} Einträge geladen. {next}', checkingExisting: 'Prüfe bestehende Bewertungen...', startingImport: 'Starte Import...', importProgress: 'Importiere zu {platform} {from}–{to}/{total}', searchProgress: 'Suche {from}–{to}/{total}', resolveProgress: 'Auflösen {from}–{to}/{total}', resolveIdCount: 'Löse IDs auf: {count} Filme', fetchingLid: 'Hole LID: {count} Filme', applyProgress: 'Wende an {from}–{to}/{total}', loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)', deepSearch: 'Tiefensuche {platform}', scanHistory: 'Scanne {platform}-Verlauf', foundCount: 'Gefunden: {count} Filme. Erstelle CSV', userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen', ratings: 'Bewertungen', watchHistory: 'Verlauf', diary: 'Tagebuch', watched: 'Gesehen', page: 'Seite', kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil', imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden', lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil', csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden', csvEmpty: '❌ CSV leer oder nicht erkannt', done: '✅ Fertig{mode}!', replaceMode: ' (Ersetzungsmodus)', rated: 'Bewertet: ', watchedShort: 'Gesehen: ', skipped: 'Übersprungen: ', notFound: 'Nicht gefunden: ', failed: 'Fehler: ', errorNotFoundKP: 'Nicht gefunden auf Kinopoisk', errorNotFoundIMDb: 'Nicht gefunden auf IMDb', errorNotFoundLB: 'Nicht gefunden auf Letterboxd', errorApi: 'API-Fehler / Netzwerkfehler', allImported: '🎉 Alle Einträge importiert!', exportDone: '✅ Export abgeschlossen! Datei gespeichert.', deepSearchBtn: '🔍 Tiefensuche ({count})', movies: 'Filme', favorites: 'Favoriten: ', likes: 'Gefällt mir', importFavorites: 'Favoriten importieren', language: 'Sprache', exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter', importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt', hardImportHint: 'Importiert aus CSV und überschreibt bestehende Bewertungen', importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt', runtime: 'Laufzeit', directors: 'Regisseur', actors: 'Schauspieler', premiereDate: 'Premiere', languageHint: 'Wähle die Sprache der Oberfläche', imdbNoData: 'Keine Bewertungen oder Verlauf gefunden — melde dich an und bewerte Filme auf IMDb', }, pt: { time: 'Tempo', exportRatings: '📤 Exportar avaliações', importRatings: '📥 Importar', hardImport: '🔄 Importação forçada', loadingPage: 'Carregando pág. {p}{total} ({count} filmes)', kpParseFailed: 'Falha ao analisar listagem do Kinopoisk', kpListingFailed: 'Falha ao carregar listagem do Kinopoisk', profileDetect: 'Detectando perfil {platform}', loadedRecords: '{count} registros carregados. {next}', checkingExisting: 'Verificando avaliações existentes...', startingImport: 'Iniciando importação...', importProgress: 'Importando para {platform} {from}–{to}/{total}', searchProgress: 'Pesquisando {from}–{to}/{total}', resolveProgress: 'Resolvendo {from}–{to}/{total}', resolveIdCount: 'Resolvendo IDs: {count} filmes', fetchingLid: 'Obtendo LID: {count} filmes', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)', deepSearch: 'Pesquisa profunda {platform}', scanHistory: 'Escaneando histórico {platform}', foundCount: 'Encontrados: {count} filmes. Gerando CSV', userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas', ratings: 'Avaliações', watchHistory: 'Histórico', diary: 'Diário', watched: 'Assistido', page: 'página', kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk', imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login', lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil', csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd', csvEmpty: '❌ CSV vazio ou não reconhecido', done: '✅ Concluído{mode}!', replaceMode: ' (modo substituição)', rated: 'Avaliado: ', watchedShort: 'Assistido: ', skipped: 'Ignorado: ', notFound: 'Não encontrado: ', failed: 'Erros: ', errorNotFoundKP: 'Não encontrado no Kinopoisk', errorNotFoundIMDb: 'Não encontrado no IMDb', errorNotFoundLB: 'Não encontrado no Letterboxd', errorApi: 'Erro de API / falha de rede', allImported: '🎉 Todos os registros importados!', exportDone: '✅ Exportação concluída! Arquivo salvo.', deepSearchBtn: '🔍 Pesquisa profunda ({count})', movies: 'filmes', favorites: 'Favoritos: ', likes: 'Curtidas', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV', importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas', hardImportHint: 'Importa de CSV e sobrescreve as avaliações existentes', importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos', runtime: 'Duração', directors: 'Diretores', actors: 'Atores', premiereDate: 'Data de estreia', languageHint: 'Selecione o idioma da interface', imdbNoData: 'Nenhuma avaliação ou histórico encontrado — faça login e avalie filmes no IMDb', }, zh: { time: '时间', exportRatings: '📤 导出评分', importRatings: '📥 导入', hardImport: '🔄 强制导入', loadingPage: '加载第 {p}{total} 页 ({count} 部电影)', kpParseFailed: '无法解析 Kinopoisk 列表', kpListingFailed: '无法加载 Kinopoisk 列表', profileDetect: '正在检测 {platform} 个人资料', loadedRecords: '已加载 {count} 条记录。{next}', checkingExisting: '正在检查现有评分...', startingImport: '开始导入...', importProgress: '正在导入到 {platform} {from}–{to}/{total}', searchProgress: '搜索中 {from}–{to}/{total}', resolveProgress: '解析中 {from}–{to}/{total}', resolveIdCount: '解析 ID: {count} 部电影', fetchingLid: '获取 LID: {count} 部电影', applyProgress: '应用中 {from}–{to}/{total}', loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)', deepSearch: '深度搜索 {platform}', scanHistory: '扫描 {platform} 历史记录', foundCount: '找到: {count} 部电影。正在生成 CSV', userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分', ratings: '评分', watchHistory: '观看历史', diary: '日记', watched: '已看', page: '页', kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面', imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户', lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料', csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd', csvEmpty: '❌ CSV 为空或无法识别', done: '✅ 完成{mode}!', replaceMode: ' (替换模式)', rated: '已评分: ', watchedShort: '已看: ', skipped: '已跳过: ', notFound: '未找到: ', failed: '错误: ', errorNotFoundKP: '未在 Kinopoisk 上找到', errorNotFoundIMDb: '未在 IMDb 上找到', errorNotFoundLB: '未在 Letterboxd 上找到', errorApi: 'API 错误 / 网络故障', allImported: '🎉 所有记录已导入!', exportDone: '✅ 导出完成! 文件已保存。', deepSearchBtn: '🔍 深度搜索 ({count})', movies: '部电影', favorites: '收藏: ', likes: '赞', importFavorites: '导入收藏', language: '语言', exportHint: '将您在该平台的所有评分下载为 CSV 文件', importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分', hardImportHint: '从 CSV 导入并覆盖现有评分', importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表', runtime: '片长', directors: '导演', actors: '演员', premiereDate: '首映日期', languageHint: '选择界面语言', imdbNoData: '未找到评分或观看历史 — 请登录并在IMDb上评分电影', }, ja: { time: '时间', exportRatings: '📤 評価をエクスポート', importRatings: '📥 インポート', hardImport: '🔄 強制インポート', loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)', kpParseFailed: 'Kinopoisk リストの解析に失敗しました', kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました', profileDetect: '{platform} プロフィールを検出中', loadedRecords: '{count} 件のレコードを読み込みました。{next}', checkingExisting: '既存の評価を確認中...', startingImport: 'インポートを開始中...', importProgress: '{platform} へのインポート {from}–{to}/{total}', searchProgress: '検索中 {from}–{to}/{total}', resolveProgress: '解決中 {from}–{to}/{total}', resolveIdCount: 'ID を解決中: {count} 作品', fetchingLid: 'LID を取得中: {count} 作品', applyProgress: '適用中 {from}–{to}/{total}', loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)', deepSearch: '詳細検索 {platform}', scanHistory: '{platform} の履歴をスキャン中', foundCount: '見つかりました: {count} 作品。CSV を生成中', userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません', ratings: '評価', watchHistory: '視聴履歴', diary: '日記', watched: '視聴済み', page: 'ページ', kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください', imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください', lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください', csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください', csvEmpty: '❌ CSV が空であるか認識できません', done: '✅ 完了{mode}!', replaceMode: ' (置換モード)', rated: '評価済み: ', watchedShort: '視聴済み: ', skipped: 'スキップ: ', notFound: '見つかりません: ', failed: 'エラー: ', errorNotFoundKP: 'Kinopoisk で見つかりません', errorNotFoundIMDb: 'IMDb で見つかりません', errorNotFoundLB: 'Letterboxd で見つかりません', errorApi: 'API エラー / ネットワーク障害', allImported: '🎉 すべてのレコードをインポートしました!', exportDone: '✅ エクスポート完了! ファイルを保存しました。', deepSearchBtn: '🔍 詳細検索 ({count})', movies: '作品', favorites: 'お気に入り: ', likes: 'いいね', importFavorites: 'お気に入りをインポート', language: '言語', exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード', importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます', hardImportHint: 'CSVからインポートし、既存の評価を上書きします', importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます', runtime: '上映時間', directors: '監督', actors: '出演者', premiereDate: '公開日', languageHint: 'インターフェース言語を選択', imdbNoData: '評価や視聴履歴が見つかりません — ログインしてIMDbで映画を評価してください', }, ko: { time: '시간', exportRatings: '📤 평점 내보내기', importRatings: '📥 가져오기', hardImport: '🔄 강제 가져오기', loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)', kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다', kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다', profileDetect: '{platform} 프로필 감지 중', loadedRecords: '{count}개 기록을 로드했습니다. {next}', checkingExisting: '기존 평점 확인 중...', startingImport: '가져오기 시작...', importProgress: '{platform} 가져오기 중 {from}–{to}/{total}', searchProgress: '검색 중 {from}–{to}/{total}', resolveProgress: '해결 중 {from}–{to}/{total}', resolveIdCount: 'ID 해결 중: {count}편', fetchingLid: 'LID 가져오는 중: {count}편', applyProgress: '적용 중 {from}–{to}/{total}', loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)', deepSearch: '심층 검색 {platform}', scanHistory: '{platform} 기록 스캔 중', foundCount: '찾음: {count}편. CSV 생성 중', userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다', ratings: '평점', watchHistory: '시청 기록', diary: '다이어리', watched: '시청함', page: '페이지', kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요', imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요', lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요', csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요', csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다', done: '✅ 완료{mode}!', replaceMode: ' (대체 모드)', rated: '평가됨: ', watchedShort: '시청함: ', skipped: '건너뜀: ', notFound: '찾을 수 없음: ', failed: '오류: ', errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음', errorNotFoundIMDb: 'IMDb에서 찾을 수 없음', errorNotFoundLB: 'Letterboxd에서 찾을 수 없음', errorApi: 'API 오류 / 네트워크 오류', allImported: '🎉 모든 기록을 가져왔습니다!', exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.', deepSearchBtn: '🔍 심층 검색 ({count})', movies: '편', favorites: '즐겨찾기: ', likes: '좋아요', importFavorites: '즐겨찾기 가져오기', language: '언어', exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드', importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다', hardImportHint: 'CSV에서 가져오고 기존 평점을 덮어씁니다', importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다', runtime: '상영 시간', directors: '감독', actors: '배우', premiereDate: '개봉일', languageHint: '인터페이스 언어 선택', imdbNoData: '평점이나 시청 기록이 없습니다 — 로그인 후 IMDb에서 영화를 평가하세요', }, };
+    const TRANSLATIONS = { en: { time: 'Time', exportRatings: '📤 Export Ratings', importRatings: '📥 Import', hardImport: '🔄 Hard Import', loadingPage: 'Loading page {p}{total} ({count} movies)', kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed', kpListingFailed: 'Failed to load Kinopoisk listing', profileDetect: 'Detecting {platform} profile', loadedRecords: 'Loaded {count} records. {next}', checkingExisting: 'Checking existing ratings...', startingImport: 'Starting import...', importProgress: 'Import to {platform} {from}–{to}/{total}', searchProgress: 'Search {from}–{to}/{total}', resolveProgress: 'Resolving {from}–{to}/{total}', resolveIdCount: 'Resolving IDs: {count} movies', fetchingLid: 'Fetching LID: {count} movies', applyProgress: 'Applying {from}–{to}/{total}', loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)', deepSearch: 'Deep search {platform}', scanHistory: 'Scanning {platform} history', foundCount: 'Found: {count} movies. Generating CSV', userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped', ratings: 'Ratings', watchHistory: 'Watch history', diary: 'Diary', watched: 'Watched', page: 'page', kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page', imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account', lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile', csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account', csvEmpty: '❌ CSV is empty or not recognized', done: '✅ Done{mode}!', replaceMode: ' (replace mode)', rated: 'Rated: ', watchedShort: 'Watched: ', skipped: 'Skipped: ', notFound: 'Not found: ', failed: 'Errors: ', errorNotFoundKP: 'Not found on Kinopoisk', errorNotFoundIMDb: 'Not found on IMDb', errorNotFoundLB: 'Not found on Letterboxd', errorApi: 'API error / network failure', allImported: '🎉 All records imported!', exportDone: '✅ Export complete! File saved.', deepSearchBtn: '🔍 Deep search ({count})', movies: 'movies', favorites: 'Favorites: ', likes: 'Likes', importFavorites: 'Import favorites', language: 'Language', exportHint: 'Download all your ratings from this platform as a CSV file', importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added', hardImportHint: 'Import from CSV and overwrite existing ratings (normal mode skips already-rated films)', importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list', runtime: 'Runtime', directors: 'Directors', actors: 'Actors', premiereDate: 'Premiere date', languageHint: 'Select the interface language', imdbNoData: 'No ratings or watch history found — make sure you are logged in and have rated films on IMDb', lblDetails: 'Details', lblSearch: 'Search', lblApply: 'Apply', lblFavorites: 'Favorites', lblExisting: 'Existing', lblHistory: 'History', lblImport: 'Import', lblPages: 'Pages', }, ru: { time: 'Время', exportRatings: '📤 Экспорт оценок', importRatings: '📥 Импорт', hardImport: '🔄 Полная замена', loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)', kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали', kpListingFailed: 'Не удалось загрузить листинг КП', profileDetect: 'Определяем профиль {platform}', loadedRecords: 'Загружено {count} записей. {next}', checkingExisting: 'Проверяем существующие оценки...', startingImport: 'Начинаем импорт...', importProgress: 'Импорт на {platform} {from}–{to}/{total}', searchProgress: 'Поиск {from}–{to}/{total}', resolveProgress: 'Резолвинг {from}–{to}/{total}', resolveIdCount: 'Резолвинг ID: {count} фильмов', fetchingLid: 'Получение LID: {count} фильмов', applyProgress: 'Применение {from}–{to}/{total}', loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)', deepSearch: 'Глубокий поиск {platform}', scanHistory: 'Сканируем историю {platform}', foundCount: 'Найдено: {count} фильмов. Формируем CSV', userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены', ratings: 'Оценки', watchHistory: 'Просмотры', diary: 'Дневник', watched: 'Просмотрено', page: 'стр.', kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП', imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт', lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль', csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd', csvEmpty: '❌ CSV пуст или не распознан', done: '✅ Готово{mode}!', replaceMode: ' (режим замены)', rated: 'Оценено: ', watchedShort: 'Просмотрено: ', skipped: 'Пропущено: ', notFound: 'Не найдено: ', failed: 'Ошибок: ', errorNotFoundKP: 'Не найдено на Кинопоиске', errorNotFoundIMDb: 'Не найдено на IMDb', errorNotFoundLB: 'Не найдено на Letterboxd', errorApi: 'Ошибка API / сетевой сбой', allImported: '🎉 Все записи импортированы!', exportDone: '✅ Экспорт завершён! Файл сохранён.', deepSearchBtn: '🔍 Искать глубже ({count})', movies: 'фильмов', favorites: 'Избранное: ', likes: 'Лайки', importFavorites: 'Импортировать избранное', language: 'Язык', exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл', importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются', hardImportHint: 'Импорт из CSV с перезаписью существующих оценок (обычный режим пропускает уже оценённые фильмы)', importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного', runtime: 'Длительность', directors: 'Режиссёры', actors: 'Актёры', premiereDate: 'Дата премьеры', languageHint: 'Выбор языка интерфейса', imdbNoData: 'Нет оценок или истории просмотров — убедитесь, что вы вошли в аккаунт и оценили фильмы на IMDb', lblDetails: 'Детали', lblSearch: 'Поиск', lblApply: 'Применение', lblFavorites: 'Избранное', lblExisting: 'Существующие', lblHistory: 'История', lblImport: 'Импорт', lblPages: 'Страницы', }, es: { time: 'Tiempo', exportRatings: '📤 Exportar valoraciones', importRatings: '📥 Importar', hardImport: '🔄 Importación forzada', loadingPage: 'Cargando pág. {p}{total} ({count} películas)', kpParseFailed: 'Error al analizar el listado de Kinopoisk', kpListingFailed: 'Error al cargar el listado de Kinopoisk', profileDetect: 'Detectando perfil de {platform}', loadedRecords: 'Cargados {count} registros. {next}', checkingExisting: 'Comprobando valoraciones existentes...', startingImport: 'Iniciando importación...', importProgress: 'Importando a {platform} {from}–{to}/{total}', searchProgress: 'Buscando {from}–{to}/{total}', resolveProgress: 'Resolviendo {from}–{to}/{total}', resolveIdCount: 'Resolviendo IDs: {count} películas', fetchingLid: 'Obteniendo LID: {count} películas', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)', deepSearch: 'Búsqueda profunda {platform}', scanHistory: 'Escaneando historial de {platform}', foundCount: 'Encontradas: {count} películas. Generando CSV', userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes', ratings: 'Valoraciones', watchHistory: 'Historial', diary: 'Diario', watched: 'Visto', page: 'página', kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk', imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión', lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil', csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd', csvEmpty: '❌ CSV vacío o no reconocido', done: '✅ ¡Listo{mode}!', replaceMode: ' (modo reemplazo)', rated: 'Valorado: ', watchedShort: 'Visto: ', skipped: 'Omitido: ', notFound: 'No encontrado: ', failed: 'Errores: ', errorNotFoundKP: 'No encontrado en Kinopoisk', errorNotFoundIMDb: 'No encontrado en IMDb', errorNotFoundLB: 'No encontrado en Letterboxd', errorApi: 'Error de API / fallo de red', allImported: '🎉 ¡Todos los registros importados!', exportDone: '✅ ¡Exportación completa! Archivo guardado.', deepSearchBtn: '🔍 Búsqueda profunda ({count})', movies: 'películas', favorites: 'Favoritos: ', likes: 'Me gusta', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV', importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden', hardImportHint: 'Importa desde CSV y sobrescribe las valoraciones existentes', importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista', runtime: 'Duración', directors: 'Directores', actors: 'Actores', premiereDate: 'Fecha de estreno', languageHint: 'Selecciona el idioma de la interfaz', imdbNoData: 'No se encontraron valoraciones ni historial — inicia sesión y valora películas en IMDb', lblDetails: 'Detalles', lblSearch: 'Búsqueda', lblApply: 'Aplicar', lblFavorites: 'Favoritos', lblExisting: 'Existentes', lblHistory: 'Historial', lblImport: 'Importar', lblPages: 'Páginas', }, fr: { time: 'Temps', exportRatings: '📤 Exporter les notes', importRatings: '📥 Importer', hardImport: '🔄 Importation forcée', loadingPage: 'Chargement p. {p}{total} ({count} films)', kpParseFailed: "Échec de l'analyse du listing Kinopoisk", kpListingFailed: 'Échec du chargement du listing Kinopoisk', profileDetect: 'Détection du profil {platform}', loadedRecords: '{count} enregistrements chargés. {next}', checkingExisting: 'Vérification des notes existantes...', startingImport: "Démarrage de l'importation...", importProgress: 'Importation vers {platform} {from}–{to}/{total}', searchProgress: 'Recherche {from}–{to}/{total}', resolveProgress: 'Résolution {from}–{to}/{total}', resolveIdCount: 'Résolution des IDs: {count} films', fetchingLid: 'Récupération LID: {count} films', applyProgress: 'Application {from}–{to}/{total}', loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)', deepSearch: 'Recherche approfondie {platform}', scanHistory: "Analyse de l'historique {platform}", foundCount: 'Trouvés: {count} films. Génération CSV', userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées', ratings: 'Notes', watchHistory: 'Historique', diary: 'Journal', watched: 'Vu', page: 'page', kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk', imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous', lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil', csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd', csvEmpty: '❌ CSV vide ou non reconnu', done: '✅ Terminé{mode}!', replaceMode: ' (mode remplacement)', rated: 'Noté: ', watchedShort: 'Vu: ', skipped: 'Ignoré: ', notFound: 'Introuvable: ', failed: 'Erreurs: ', errorNotFoundKP: 'Non trouvé sur Kinopoisk', errorNotFoundIMDb: 'Non trouvé sur IMDb', errorNotFoundLB: 'Non trouvé sur Letterboxd', errorApi: 'Erreur API / problème réseau', allImported: '🎉 Tous les enregistrements importés!', exportDone: '✅ Export terminé! Fichier sauvegardé.', deepSearchBtn: '🔍 Recherche approfondie ({count})', movies: 'films', favorites: 'Favoris: ', likes: 'J\'aime', importFavorites: 'Importer les favoris', language: 'Langue', exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV', importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées', hardImportHint: 'Importe depuis CSV et écrase les notes existantes', importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris', runtime: 'Durée', directors: 'Réalisateurs', actors: 'Acteurs', premiereDate: 'Date de sortie', languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera', imdbNoData: 'Aucune note ni historique trouvé — connectez-vous et notez des films sur IMDb', lblDetails: 'Détails', lblSearch: 'Recherche', lblApply: 'Appliquer', lblFavorites: 'Favoris', lblExisting: 'Existants', lblHistory: 'Historique', lblImport: 'Importer', lblPages: 'Pages', }, de: { time: 'Zeit', exportRatings: '📤 Bewertungen exportieren', importRatings: '📥 Importieren', hardImport: '🔄 Hartimport', loadingPage: 'Lade Seite {p}{total} ({count} Filme)', kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden', kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden', profileDetect: 'Erkenne {platform}-Profil', loadedRecords: '{count} Einträge geladen. {next}', checkingExisting: 'Prüfe bestehende Bewertungen...', startingImport: 'Starte Import...', importProgress: 'Importiere zu {platform} {from}–{to}/{total}', searchProgress: 'Suche {from}–{to}/{total}', resolveProgress: 'Auflösen {from}–{to}/{total}', resolveIdCount: 'Löse IDs auf: {count} Filme', fetchingLid: 'Hole LID: {count} Filme', applyProgress: 'Wende an {from}–{to}/{total}', loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)', deepSearch: 'Tiefensuche {platform}', scanHistory: 'Scanne {platform}-Verlauf', foundCount: 'Gefunden: {count} Filme. Erstelle CSV', userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen', ratings: 'Bewertungen', watchHistory: 'Verlauf', diary: 'Tagebuch', watched: 'Gesehen', page: 'Seite', kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil', imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden', lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil', csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden', csvEmpty: '❌ CSV leer oder nicht erkannt', done: '✅ Fertig{mode}!', replaceMode: ' (Ersetzungsmodus)', rated: 'Bewertet: ', watchedShort: 'Gesehen: ', skipped: 'Übersprungen: ', notFound: 'Nicht gefunden: ', failed: 'Fehler: ', errorNotFoundKP: 'Nicht gefunden auf Kinopoisk', errorNotFoundIMDb: 'Nicht gefunden auf IMDb', errorNotFoundLB: 'Nicht gefunden auf Letterboxd', errorApi: 'API-Fehler / Netzwerkfehler', allImported: '🎉 Alle Einträge importiert!', exportDone: '✅ Export abgeschlossen! Datei gespeichert.', deepSearchBtn: '🔍 Tiefensuche ({count})', movies: 'Filme', favorites: 'Favoriten: ', likes: 'Gefällt mir', importFavorites: 'Favoriten importieren', language: 'Sprache', exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter', importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt', hardImportHint: 'Importiert aus CSV und überschreibt bestehende Bewertungen', importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt', runtime: 'Laufzeit', directors: 'Regisseur', actors: 'Schauspieler', premiereDate: 'Premiere', languageHint: 'Wähle die Sprache der Oberfläche', imdbNoData: 'Keine Bewertungen oder Verlauf gefunden — melde dich an und bewerte Filme auf IMDb', lblDetails: 'Details', lblSearch: 'Suche', lblApply: 'Anwenden', lblFavorites: 'Favoriten', lblExisting: 'Vorhandene', lblHistory: 'Verlauf', lblImport: 'Import', lblPages: 'Seiten', }, pt: { time: 'Tempo', exportRatings: '📤 Exportar avaliações', importRatings: '📥 Importar', hardImport: '🔄 Importação forçada', loadingPage: 'Carregando pág. {p}{total} ({count} filmes)', kpParseFailed: 'Falha ao analisar listagem do Kinopoisk', kpListingFailed: 'Falha ao carregar listagem do Kinopoisk', profileDetect: 'Detectando perfil {platform}', loadedRecords: '{count} registros carregados. {next}', checkingExisting: 'Verificando avaliações existentes...', startingImport: 'Iniciando importação...', importProgress: 'Importando para {platform} {from}–{to}/{total}', searchProgress: 'Pesquisando {from}–{to}/{total}', resolveProgress: 'Resolvendo {from}–{to}/{total}', resolveIdCount: 'Resolvendo IDs: {count} filmes', fetchingLid: 'Obtendo LID: {count} filmes', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)', deepSearch: 'Pesquisa profunda {platform}', scanHistory: 'Escaneando histórico {platform}', foundCount: 'Encontrados: {count} filmes. Gerando CSV', userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas', ratings: 'Avaliações', watchHistory: 'Histórico', diary: 'Diário', watched: 'Assistido', page: 'página', kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk', imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login', lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil', csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd', csvEmpty: '❌ CSV vazio ou não reconhecido', done: '✅ Concluído{mode}!', replaceMode: ' (modo substituição)', rated: 'Avaliado: ', watchedShort: 'Assistido: ', skipped: 'Ignorado: ', notFound: 'Não encontrado: ', failed: 'Erros: ', errorNotFoundKP: 'Não encontrado no Kinopoisk', errorNotFoundIMDb: 'Não encontrado no IMDb', errorNotFoundLB: 'Não encontrado no Letterboxd', errorApi: 'Erro de API / falha de rede', allImported: '🎉 Todos os registros importados!', exportDone: '✅ Exportação concluída! Arquivo salvo.', deepSearchBtn: '🔍 Pesquisa profunda ({count})', movies: 'filmes', favorites: 'Favoritos: ', likes: 'Curtidas', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV', importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas', hardImportHint: 'Importa de CSV e sobrescreve as avaliações existentes', importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos', runtime: 'Duração', directors: 'Diretores', actors: 'Atores', premiereDate: 'Data de estreia', languageHint: 'Selecione o idioma da interface', imdbNoData: 'Nenhuma avaliação ou histórico encontrado — faça login e avalie filmes no IMDb', lblDetails: 'Detalhes', lblSearch: 'Busca', lblApply: 'Aplicar', lblFavorites: 'Favoritos', lblExisting: 'Existentes', lblHistory: 'Histórico', lblImport: 'Importar', lblPages: 'Páginas', }, zh: { time: '时间', exportRatings: '📤 导出评分', importRatings: '📥 导入', hardImport: '🔄 强制导入', loadingPage: '加载第 {p}{total} 页 ({count} 部电影)', kpParseFailed: '无法解析 Kinopoisk 列表', kpListingFailed: '无法加载 Kinopoisk 列表', profileDetect: '正在检测 {platform} 个人资料', loadedRecords: '已加载 {count} 条记录。{next}', checkingExisting: '正在检查现有评分...', startingImport: '开始导入...', importProgress: '正在导入到 {platform} {from}–{to}/{total}', searchProgress: '搜索中 {from}–{to}/{total}', resolveProgress: '解析中 {from}–{to}/{total}', resolveIdCount: '解析 ID: {count} 部电影', fetchingLid: '获取 LID: {count} 部电影', applyProgress: '应用中 {from}–{to}/{total}', loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)', deepSearch: '深度搜索 {platform}', scanHistory: '扫描 {platform} 历史记录', foundCount: '找到: {count} 部电影。正在生成 CSV', userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分', ratings: '评分', watchHistory: '观看历史', diary: '日记', watched: '已看', page: '页', kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面', imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户', lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料', csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd', csvEmpty: '❌ CSV 为空或无法识别', done: '✅ 完成{mode}!', replaceMode: ' (替换模式)', rated: '已评分: ', watchedShort: '已看: ', skipped: '已跳过: ', notFound: '未找到: ', failed: '错误: ', errorNotFoundKP: '未在 Kinopoisk 上找到', errorNotFoundIMDb: '未在 IMDb 上找到', errorNotFoundLB: '未在 Letterboxd 上找到', errorApi: 'API 错误 / 网络故障', allImported: '🎉 所有记录已导入!', exportDone: '✅ 导出完成! 文件已保存。', deepSearchBtn: '🔍 深度搜索 ({count})', movies: '部电影', favorites: '收藏: ', likes: '赞', importFavorites: '导入收藏', language: '语言', exportHint: '将您在该平台的所有评分下载为 CSV 文件', importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分', hardImportHint: '从 CSV 导入并覆盖现有评分', importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表', runtime: '片长', directors: '导演', actors: '演员', premiereDate: '首映日期', languageHint: '选择界面语言', imdbNoData: '未找到评分或观看历史 — 请登录并在IMDb上评分电影', lblDetails: '详情', lblSearch: '搜索', lblApply: '应用', lblFavorites: '收藏', lblExisting: '现有', lblHistory: '历史', lblImport: '导入', lblPages: '翻页', }, ja: { time: '时间', exportRatings: '📤 評価をエクスポート', importRatings: '📥 インポート', hardImport: '🔄 強制インポート', loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)', kpParseFailed: 'Kinopoisk リストの解析に失敗しました', kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました', profileDetect: '{platform} プロフィールを検出中', loadedRecords: '{count} 件のレコードを読み込みました。{next}', checkingExisting: '既存の評価を確認中...', startingImport: 'インポートを開始中...', importProgress: '{platform} へのインポート {from}–{to}/{total}', searchProgress: '検索中 {from}–{to}/{total}', resolveProgress: '解決中 {from}–{to}/{total}', resolveIdCount: 'ID を解決中: {count} 作品', fetchingLid: 'LID を取得中: {count} 作品', applyProgress: '適用中 {from}–{to}/{total}', loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)', deepSearch: '詳細検索 {platform}', scanHistory: '{platform} の履歴をスキャン中', foundCount: '見つかりました: {count} 作品。CSV を生成中', userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません', ratings: '評価', watchHistory: '視聴履歴', diary: '日記', watched: '視聴済み', page: 'ページ', kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください', imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください', lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください', csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください', csvEmpty: '❌ CSV が空であるか認識できません', done: '✅ 完了{mode}!', replaceMode: ' (置換モード)', rated: '評価済み: ', watchedShort: '視聴済み: ', skipped: 'スキップ: ', notFound: '見つかりません: ', failed: 'エラー: ', errorNotFoundKP: 'Kinopoisk で見つかりません', errorNotFoundIMDb: 'IMDb で見つかりません', errorNotFoundLB: 'Letterboxd で見つかりません', errorApi: 'API エラー / ネットワーク障害', allImported: '🎉 すべてのレコードをインポートしました!', exportDone: '✅ エクスポート完了! ファイルを保存しました。', deepSearchBtn: '🔍 詳細検索 ({count})', movies: '作品', favorites: 'お気に入り: ', likes: 'いいね', importFavorites: 'お気に入りをインポート', language: '言語', exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード', importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます', hardImportHint: 'CSVからインポートし、既存の評価を上書きします', importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます', runtime: '上映時間', directors: '監督', actors: '出演者', premiereDate: '公開日', languageHint: 'インターフェース言語を選択', imdbNoData: '評価や視聴履歴が見つかりません — ログインしてIMDbで映画を評価してください', lblDetails: '詳細', lblSearch: '検索', lblApply: '適用', lblFavorites: 'お気に入り', lblExisting: '既存', lblHistory: '履歴', lblImport: 'インポート', lblPages: 'ページ', }, ko: { time: '시간', exportRatings: '📤 평점 내보내기', importRatings: '📥 가져오기', hardImport: '🔄 강제 가져오기', loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)', kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다', kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다', profileDetect: '{platform} 프로필 감지 중', loadedRecords: '{count}개 기록을 로드했습니다. {next}', checkingExisting: '기존 평점 확인 중...', startingImport: '가져오기 시작...', importProgress: '{platform} 가져오기 중 {from}–{to}/{total}', searchProgress: '검색 중 {from}–{to}/{total}', resolveProgress: '해결 중 {from}–{to}/{total}', resolveIdCount: 'ID 해결 중: {count}편', fetchingLid: 'LID 가져오는 중: {count}편', applyProgress: '적용 중 {from}–{to}/{total}', loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)', deepSearch: '심층 검색 {platform}', scanHistory: '{platform} 기록 스캔 중', foundCount: '찾음: {count}편. CSV 생성 중', userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다', ratings: '평점', watchHistory: '시청 기록', diary: '다이어리', watched: '시청함', page: '페이지', kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요', imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요', lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요', csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요', csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다', done: '✅ 완료{mode}!', replaceMode: ' (대체 모드)', rated: '평가됨: ', watchedShort: '시청함: ', skipped: '건너뜀: ', notFound: '찾을 수 없음: ', failed: '오류: ', errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음', errorNotFoundIMDb: 'IMDb에서 찾을 수 없음', errorNotFoundLB: 'Letterboxd에서 찾을 수 없음', errorApi: 'API 오류 / 네트워크 오류', allImported: '🎉 모든 기록을 가져왔습니다!', exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.', deepSearchBtn: '🔍 심층 검색 ({count})', movies: '편', favorites: '즐겨찾기: ', likes: '좋아요', importFavorites: '즐겨찾기 가져오기', language: '언어', exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드', importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다', hardImportHint: 'CSV에서 가져오고 기존 평점을 덮어씁니다', importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다', runtime: '상영 시간', directors: '감독', actors: '배우', premiereDate: '개봉일', languageHint: '인터페이스 언어 선택', imdbNoData: '평점이나 시청 기록이 없습니다 — 로그인 후 IMDb에서 영화를 평가하세요', lblDetails: '상세', lblSearch: '검색', lblApply: '적용', lblFavorites: '즐겨찾기', lblExisting: '기존', lblHistory: '기록', lblImport: '가져오기', lblPages: '페이지', }, };
 
     function getLocale() {
         // Check localStorage for user-saved language preference
@@ -295,23 +299,31 @@
     }
 
     // --- Adaptive Concurrency v2: Latency-Gradient (TCP Vegas/Netflix style) ---
-    // Tracks minLatency vs currentLatency ratio to detect queueing
+    // Compares the current round's average latency with the best *sustained*
+    // average seen so far. The old code used the single fastest request ever as
+    // the baseline, so a normal 200↔400 ms spread looked like congestion,
+    // concurrency shrank by 5 every round and every import settled at MIN=5.
     function makeProbe(init = CONCURRENCY.INIT, maxC = CONCURRENCY.MAX) {
-        return { c: init, minLatency: Infinity, window: [], windowSize: 10, maxC };
+        // Clamp the start: callers pass a per-platform init that may sit above a
+        // lowered cap, and an un-clamped start would ignore the cap until the
+        // first probeFail.
+        return { c: Math.max(CONCURRENCY.MIN, Math.min(init, maxC)), maxC, window: [], windowSize: 8, base: 0 };
     }
 
     function probeOk(p, latency) {
+        if (!(latency > 0)) return;
         p.window.push(latency);
         if (p.window.length > p.windowSize) p.window.shift();
-        p.minLatency = Math.min(p.minLatency, latency);
-
-        const avgLatency = p.window.reduce((a, b) => a + b, 0) / p.window.length;
-        const gradient = p.minLatency / avgLatency;
+        if (p.window.length < 3) return;
+        const avg = p.window.reduce((a, b) => a + b, 0) / p.window.length;
         const max = p.maxC || CONCURRENCY.MAX;
-
-        if (gradient > 0.95 && p.c < max) {
-            p.c = Math.min(max, p.c + CONCURRENCY.UP);
-        } else if (gradient < 0.85 && p.c > CONCURRENCY.MIN) {
+        if (!p.base || avg < p.base) { p.base = avg; return; }
+        const ratio = p.base / avg;
+        if (ratio >= 0.8) {
+            // Latency is still within normal jitter of the best round: grow.
+            if (p.c < max) p.c = Math.min(max, p.c + CONCURRENCY.UP);
+        } else if (ratio < 0.5 && p.c > CONCURRENCY.MIN) {
+            // Only a real doubling of latency (queueing at the server) backs off.
             p.c = Math.max(CONCURRENCY.MIN, p.c - CONCURRENCY.DOWN);
         }
     }
@@ -325,6 +337,27 @@
     const lbProbe = makeProbe(20, PLATFORM_MAX.lb);
     const imdbProbe = makeProbe(20, PLATFORM_MAX.imdb);
     const kpGqlDelay = { val: DELAY.GQL_INIT }, imdbGqlDelay = { val: DELAY.GQL_INIT };
+    // Negative search cache: a title that failed to resolve is not retried on
+    // every subsequent import for the next few hours.
+    const SEARCH_NEG_TTL = 6 * 60 * 60 * 1000;
+    const _kpNeg = new Map();
+    const _lbNeg = new Map();
+
+    // A fallback search endpoint that keeps failing is not worth its timeout on
+    // every remaining title: after `maxFails` consecutive misses the slow path
+    // is disabled for the rest of the run and re-enabled on the next one.
+    function makeBreaker(maxFails = 8) {
+        return {
+            fails: 0,
+            open: false,
+            fail() { this.fails++; if (this.fails >= maxFails) this.open = true; return this.open; },
+            ok() { this.fails = 0; },
+            reset() { this.fails = 0; this.open = false; },
+        };
+    }
+    let kpHtmlBreaker = makeBreaker(8);
+    let imdbHtmlBreaker = makeBreaker(8);
+    let lbHtmlBreaker = makeBreaker(8);
 
     const clearStatus = (el) => {
         if (!el) return;
@@ -335,6 +368,82 @@
         el.textContent = '';
         el.style.display = 'none';
         el.__progressBar = null;
+    };
+
+    // Card shell: header (pulse, title, elapsed timer) + thin progress bar.
+    // Created once and never cleared, so phase rows written before the first
+    // title update are not wiped. Every flow funnels through this.
+    const ensureStatusShell = (el) => {
+        if (!el) return null;
+        el.style.display = 'block';
+        let header = el.querySelector('.mrs-status__header');
+        if (!header) {
+            header = document.createElement('div');
+            header.className = 'mrs-status__header';
+            const pulse = document.createElement('span');
+            pulse.className = 'mrs-pulse';
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'mrs-status__title';
+            const titleText = document.createElement('span');
+            titleText.className = 'mrs-status__title-text';
+            titleSpan.appendChild(titleText);
+            const timerSpan = document.createElement('span');
+            timerSpan.className = 'mrs-status__timer';
+            header.append(pulse, titleSpan, timerSpan);
+            el.insertBefore(header, el.firstChild);
+            el.__statusStart = Date.now();
+        }
+        if (!el.__statusTimer) {
+            el.__statusTimer = setInterval(() => {
+                const timer = el.querySelector('.mrs-status__timer');
+                if (timer && el.__statusStart) timer.textContent = formatElapsed(Date.now() - el.__statusStart);
+            }, 500);
+        }
+        let bar = el.querySelector('.mrs-status__progress-bar');
+        if (!bar) {
+            const progressEl = document.createElement('div');
+            progressEl.className = 'mrs-status__progress';
+            bar = document.createElement('div');
+            bar.className = 'mrs-status__progress-bar';
+            progressEl.appendChild(bar);
+            el.appendChild(progressEl);
+        }
+        el.__progressBar = bar;
+        if (!el.__statusStart) el.__statusStart = Date.now();
+        return { header, bar };
+    };
+
+    // Header title only. Unlike the old setStatus it never wipes the card, so
+    // the phase rows below it survive every text update.
+    const setTitle = (el, text) => {
+        if (!el || text == null) return;
+        ensureStatusShell(el);
+        const titleSpan = el.querySelector('.mrs-status__title');
+        if (!titleSpan) return;
+        const cached = el.__titleText ?? '';
+        if (cached === text) return;
+        el.__titleText = text;
+        let main = titleSpan.querySelector('.mrs-status__title-text');
+        if (!main) {
+            titleSpan.textContent = '';
+            main = document.createElement('span');
+            main.className = 'mrs-status__title-text';
+            titleSpan.appendChild(main);
+        }
+        main.textContent = text;
+    };
+
+    // Fresh card for a new run (normal import, deep search retry): old rows and
+    // their checkmarks must never survive into the next pass.
+    const beginRun = (el, title) => {
+        if (!el) return;
+        clearStatus(el);
+        ensureStatusShell(el);
+        setTitle(el, title);
+        // A new run gets a fresh chance at the optional search endpoints.
+        kpHtmlBreaker.reset();
+        imdbHtmlBreaker.reset();
+        lbHtmlBreaker.reset();
     };
 
     // ── Multi-channel status ────────────────────────────────────────────────
@@ -354,7 +463,10 @@
         return list;
     }
 
-    function channelRow(el, channel) {
+    // `channel` is a stable internal id; `label` is the visible, translated
+    // name. Keeping them apart means two phases can never collide and a row
+    // keeps its identity even when the language changes mid-run.
+    function channelRow(el, channel, label) {
         const list = ensureChannels(el);
         if (!list) return null;
         let row = list.querySelector('[data-channel="' + CSS.escape(channel) + '"]');
@@ -364,12 +476,12 @@
         row.className = 'mrs-status__row';
         row.dataset.channel = channel;
         row.dataset.started = String(Date.now());
-        const label = document.createElement('span');
-        label.className = 'mrs-status__row-label';
-        label.textContent = channel;
+        const labelEl = document.createElement('span');
+        labelEl.className = 'mrs-status__row-label';
+        labelEl.textContent = label || channel;
         const text = document.createElement('span');
         text.className = 'mrs-status__row-text';
-        row.append(label, text);
+        row.append(labelEl, text);
         list.appendChild(row);
         return row;
     }
@@ -388,98 +500,86 @@
         if (metaEl.textContent !== metaText) metaEl.textContent = metaText;
     }
 
-    function setChannelStatus(el, channel, text, progress) {
+    function setChannelStatus(el, channel, text, progress, label) {
         if (!el || !channel) return;
         el.style.display = 'block';
-        const row = channelRow(el, channel);
+        const row = channelRow(el, channel, label);
         if (!row) return;
-        const meta = (progress && progress.total) ? progress.current + '/' + progress.total : '';
-        if (progress && progress.total) {
+        const hasProgress = !!(progress && progress.total > 0);
+        // `extra` is the muted tail after the separator: the found-item count,
+        // a checkmark tally, or '' for "no tail". Passing no `extra` with a
+        // total falls back to `done/total`, which is only used when the main
+        // text does not already spell it out.
+        const extra = progress && progress.extra != null ? String(progress.extra)
+            : hasProgress ? progress.current + '/' + progress.total
+                : '';
+        if (hasProgress) {
             row.dataset.done = String(progress.current);
             row.dataset.total = String(progress.total);
-        } else if (!row.dataset.mark) {
-            const secs = Math.max(0, Math.round((Date.now() - Number(row.dataset.started || Date.now())) / 1000));
-            setRowParts(row, text, secs >= 1 ? formatElapsed(secs * 1000) : '');
+        }
+        // A finished row keeps its final text: a straggling request must not
+        // repaint a ✓ row back to "1/5".
+        if (row.dataset.mark) return;
+        if (progress && (hasProgress || progress.extra != null)) {
+            setRowParts(row, text, extra);
+            updateOverallBar(el);
             return;
         }
-        setRowParts(row, text, meta);
+        const secs = Math.max(0, Math.round((Date.now() - Number(row.dataset.started || Date.now())) / 1000));
+        setRowParts(row, text, secs >= 1 ? formatElapsed(secs * 1000) : '');
     }
 
-    function finishChannel(el, channel, ok) {
+    // Aggregate bar: the sum of every phase row's done/total, so the thin strip
+    // reflects the whole run instead of flickering per channel.
+    function updateOverallBar(el) {
+        if (!el) return;
+        const bar = el.querySelector('.mrs-status__progress-bar');
+        if (!bar) return;
+        let done = 0, total = 0;
+        for (const row of el.querySelectorAll('.mrs-status__row')) {
+            const t = Number(row.dataset.total || 0);
+            if (!t) continue;
+            const d = row.dataset.mark ? t : Number(row.dataset.done || 0);
+            total += t;
+            done += Math.min(d, t);
+        }
+        if (!total) return;
+        bar.style.width = Math.round((done / total) * 100) + '%';
+    }
+
+    function finishChannel(el, channel, ok, keepMeta) {
         if (!el || !channel) return;
         const row = el.querySelector('[data-channel="' + CSS.escape(channel) + '"]');
         if (!row || row.dataset.mark) return;
         row.dataset.mark = ok ? 'ok' : 'fail';
         row.classList.add(ok ? 'mrs-status__row--done' : 'mrs-status__row--fail');
-        // Drop the muted progress part and put the mark in the row tail, so it
-        // stays visible even when the label text is ellipsised.
-        const meta = row.querySelector('.mrs-status__row-text .mrs-status__row-meta');
-        if (meta) meta.remove();
+        // Drop the muted progress part unless the caller wants a final tally
+        // (e.g. "· 250 films"), and put the mark in the row tail so it stays
+        // visible even when the main text is ellipsised.
+        if (!keepMeta) {
+            const meta = row.querySelector('.mrs-status__row-text .mrs-status__row-meta');
+            if (meta) meta.remove();
+        }
         const mark = document.createElement('span');
         mark.className = 'mrs-status__row-mark';
         mark.textContent = ok ? '\u2713' : '!';
         row.appendChild(mark);
+        updateOverallBar(el);
     }
 
     // Writer bound to one channel; callers just push text/progress.
-    function channelWriter(el, channel) {
-        return (text, progress) => setChannelStatus(el, channel, text, progress);
+    function channelWriter(el, channel, label) {
+        return (text, progress) => setChannelStatus(el, channel, text, progress, label);
     }
 
 
     const setStatus = (el, text, progress) => {
         if (!el) return;
-        el.style.display = 'block';
-        if (!el.querySelector('.mrs-status__header')) {
-            el.textContent = '';
-            const header = document.createElement('div');
-            header.className = 'mrs-status__header';
-            const pulse = document.createElement('span');
-            pulse.className = 'mrs-pulse';
-            header.appendChild(pulse);
-            const titleSpan = document.createElement('span');
-            titleSpan.className = 'mrs-status__title';
-            header.appendChild(titleSpan);
-            const timerSpan = document.createElement('span');
-            timerSpan.className = 'mrs-status__timer';
-            header.appendChild(timerSpan);
-            el.appendChild(header);
-            const progressEl = document.createElement('div');
-            progressEl.className = 'mrs-status__progress';
-            const bar = document.createElement('div');
-            bar.className = 'mrs-status__progress-bar';
-            progressEl.appendChild(bar);
-            el.appendChild(progressEl);
-            el.__progressBar = bar;
-            el.__statusStart = Date.now();
-            if (!el.__statusTimer) {
-                el.__statusTimer = setInterval(() => {
-                    const timer = el.querySelector('.mrs-status__title-timer');
-                    if (timer && el.__statusStart) timer.textContent = formatElapsed(Date.now() - el.__statusStart);
-                }, 500);
-            }
-        }
-        const titleSpan = el.querySelector('.mrs-status__title');
-        if (titleSpan) {
-            // Only touch the DOM when the visible text really changes; rewriting
-            // identical text still re-renders and reads as flicker.
-            const cached = el.__titleText || '';
-            if (cached !== text) {
-                el.__titleText = text;
-                let main = titleSpan.querySelector('.mrs-status__title-text');
-                if (!main) {
-                    titleSpan.textContent = '';
-                    main = document.createElement('span');
-                    main.className = 'mrs-status__title-text';
-                    const stamp = document.createElement('span');
-                    stamp.className = 'mrs-status__title-timer';
-                    titleSpan.append(main, stamp);
-                }
-                main.textContent = text;
-            }
-        }
-
-        if (progress && el.__progressBar) {
+        // Never wipe: `el.textContent = ''` here used to erase phase rows that
+        // the parallel scrapers had already drawn.
+        ensureStatusShell(el);
+        setTitle(el, text);
+        if (progress && progress.total && el.__progressBar) {
             const pct = Math.round((progress.current / progress.total) * 100);
             el.__progressBar.style.width = pct + '%';
         }
@@ -1440,15 +1540,21 @@
 
     async function performKPExport(statusEl) {
         const kpExportStart = Date.now();
+        const el = statusEl;
+        beginRun(el, t('profileDetect', { platform: 'Kinopoisk' }));
         const uid = await resolveKPUserId(statusEl);
         if (!uid) throw new Error(t('kpUserIdNotFound'));
 
         const baseUrl = `https://www.kinopoisk.ru/user/${uid}/movies/voted-watched`;
         let allItems = [], totalPages = 0;
         const stats = { pages: 0, ssr: 0, fallback: 0, retries: 0 };
+        // Two long phases, so two rows: listing pages, then film detail pages.
+        const chPages = channelWriter(el, 'kpExportPages', t('lblPages'));
+        const chDetails = channelWriter(el, 'kpDetails', t('lblDetails'));
+        const writePages = (done, total) => chPages(`${t('page')} ${done}/${total}`, { current: done, total });
 
         // Fetch page 1 first to discover totalPages
-        setStatus(statusEl, t('loadingPage', { p: 1, total: '', count: 0 }) + dots());
+        chPages(`${t('page')} 1`, { current: 0, total: 0 });
         {
             let items = [];
             for (let attempt = 1; attempt <= 3; attempt++) {
@@ -1473,9 +1579,7 @@
             const pageNums = [];
             for (let p = 2; p <= totalPages; p++) pageNums.push(p);
             let kpPagesDone = 1; // page 1 was fetched above
-            const kpPageReport = () => setStatus(statusEl,
-                t('loadingPage', { p: kpPagesDone, total: '/' + totalPages, count: allItems.length }) + dots(),
-                { current: kpPagesDone, total: totalPages });
+            const kpPageReport = () => writePages(kpPagesDone, totalPages);
             kpPageReport();
             const pageResults = await asyncPool(10, pageNums, async (p) => {
                 try {
@@ -1503,15 +1607,18 @@
                     allItems = allItems.concat(v.items);
                 }
             }
-            setStatus(statusEl, t('loadingPage', { p: totalPages, total: '/' + totalPages, count: allItems.length }));
+            writePages(totalPages, totalPages);
+        } else {
+            writePages(1, 1);
         }
+        finishChannel(el, 'kpExportPages', allItems.length > 0);
 
         if (allItems.length === 0) throw new Error(t('kpListingFailed'));
 
         const unique = [...new Map(allItems.map(i => [i.kpId, i])).values()];
 
         // Fetch film details from Kinopoisk film pages
-        setStatus(statusEl, `Fetching film details: 0/${unique.length}`, { current: 0, total: unique.length });
+        chDetails(`0/${unique.length}`, { current: 0, total: unique.length });
         const kpRateLimit = makeRateLimiter(15);
         let kpDetailsDone = 0;
         const kpDetailResults = await asyncPool(20, unique, async i => {
@@ -1527,7 +1634,7 @@
             } finally {
                 kpDetailsDone++;
                 if (kpDetailsDone % 5 === 0 || kpDetailsDone === unique.length) {
-                    setStatus(statusEl, `Fetching film details: ${kpDetailsDone}/${unique.length}`, { current: kpDetailsDone, total: unique.length });
+                    chDetails(`${kpDetailsDone}/${unique.length}`, { current: kpDetailsDone, total: unique.length });
                 }
             }
         });
@@ -1542,6 +1649,7 @@
                 item.premiereDate = r.value.premiereDate;
             }
         });
+        finishChannel(el, 'kpDetails', true, true);
         filmDetailCache.flush();
         const kpExportElapsed = Date.now() - kpExportStart;
         DEBUG && console.log(`[mrs] KP export: ${unique.length} ${t('movies')}, pages: ${totalPages || '?'}, SSR: ${stats.ssr}, fallback: ${stats.fallback}, retries: ${stats.retries}, time: ${formatElapsed(kpExportElapsed)}`);
@@ -1641,11 +1749,29 @@
                 if (!text) { adjDelay(kpGqlDelay, 'error'); continue; }
                 let json;
                 try { json = JSON.parse(text); } catch {
+                    // Kinopoisk answers a throttled request with an HTML 403 page,
+                    // not JSON. Measured: the same keyword succeeds again after
+                    // ~400 ms, so retrying after a short pause saves the film
+                    // instead of throwing it away as "not found".
+                    if (status === 403 || status === 429 || status >= 500) {
+                        adjDelay(kpGqlDelay, status === 429 ? '429' : 'error');
+                        if (i < RETRY.GQL) await sleep(300 + Math.random() * 250 + i * 200);
+                        continue;
+                    }
                     console.warn(`[mrs] KP GQL non-JSON response (${status}):`, text.slice(0, 300));
                     adjDelay(kpGqlDelay, 'error');
                     continue;
                 }
                 if (json?.errors && !json?.data) {
+                    // 403/429/5xx here is Kinopoisk's anti-fraud throttle, not a
+                    // dead query: measured with 40 concurrent Suggest calls, a
+                    // 403'd request succeeds again after ~400 ms, so treating it
+                    // as fatal marked perfectly good films as "failed".
+                    if (status === 403 || status === 429 || status >= 500) {
+                        adjDelay(kpGqlDelay, status === 429 ? '429' : 'error');
+                        if (i < RETRY.GQL) await sleep(300 + Math.random() * 300 + i * 200);
+                        continue;
+                    }
                     console.warn(`[mrs] KP GQL errors (${status}):`, JSON.stringify(json.errors).slice(0, 500));
                     adjDelay(kpGqlDelay, 'error');
                     if (status >= 400 && status < 500) throw new Error(`GQL ${status}`);
@@ -1676,59 +1802,90 @@
 
     async function searchKPId(title, year, deep = false, allTitles = []) {
         const cacheKey = `kp:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}`;
+        // Successful matches survive between runs: a re-import of the same CSV
+        // must not pay for the same lookup twice.
+        const cached = searchCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+        const negTs = _kpNeg.get(cacheKey);
+        if (negTs && Date.now() - negTs < SEARCH_NEG_TTL) return null;
         return dedupeFetch(cacheKey, async () => {
             const nKey = normTitle(title);
             const variants = deep ? getTitleVariants(title, allTitles) : getTitleVariants(title, allTitles).slice(0, 5);
             let best = null;
 
             // --- Phase 1: GQL Suggest ---
+            // One request per variant, stopped at the first confident hit. The
+            // old loop asked the same query twice (`for pass = 0; pass < 2`) and
+            // parsed the identical JSON again — that alone doubled the cost of
+            // every KP search. Spellings stay sequential on purpose: GraphQL is
+            // the rate-limited, anti-fraud-guarded endpoint here.
             for (const q of variants.slice(0, deep ? variants.length : 3)) {
-                const vars = { keyword: q, yandexCityId: 6, limit: 20, withUserData: true };
-                for (let pass = 0; pass < 2; pass++) {
-                    const json = await kpGql(KP_SUGGEST_QUERY, vars, 'SuggestSearch');
-                    if (json?.errors) console.warn('[mrs] KP search errors:', JSON.stringify(json.errors).slice(0, 500));
-                    const top = json?.data?.suggest?.top;
-                    if (!top) continue;
+                const json = await kpGql(KP_SUGGEST_QUERY, { keyword: q, yandexCityId: 6, limit: 20, withUserData: true }, 'SuggestSearch');
+                if (json?.errors) console.warn('[mrs] KP search errors:', JSON.stringify(json.errors).slice(0, 500));
+                const top = json?.data?.suggest?.top;
+                if (!top) continue;
 
-                    const candidates = [];
-                    const tr = top.topResult?.global;
-                    if (tr && !tr.__typename?.includes('Person')) candidates.push(tr);
-                    for (const e of top.movies ?? []) candidates.push(e?.movie);
+                const candidates = [];
+                const tr = top.topResult?.global;
+                if (tr && !tr.__typename?.includes('Person')) candidates.push(tr);
+                for (const e of top.movies ?? []) candidates.push(e?.movie);
 
-                    for (const m of candidates) {
-                        if (!m?.id) continue;
-                        const hit = pass === 0 ? matchMovie(m, nKey, year) : m;
-                        if (!hit) continue;
-                        const cand = {
-                            kpId: String(hit.id),
-                            titleRu: hit.title?.russian || '',
-                            titleOrig: hit.title?.original || '',
-                            year: String(hit.productionYear ?? hit.releaseYears?.start ?? hit.releaseYears?.end ?? ''),
-                            type: hit.__typename || 'Film',
-                        };
-                        const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
-                        const conf = confidenceLabel(score);
-                        if (conf === 'high') {
-                            DEBUG && console.log(`[mrs] KP search HIGH confidence: "${title}" (${year}) → kpId=${cand.kpId} score=${score.toFixed(2)}`);
-                            if (!year || !cand.year || yearsMatch(cand.year, year)) {
-                                return { ...cand, score, confidence: conf };
-                            }
-                        }
-                        if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                for (const m of candidates) {
+                    if (!m?.id) continue;
+                    const hit = matchMovie(m, nKey, year);
+                    if (!hit) continue;
+                    const cand = {
+                        kpId: String(hit.id),
+                        titleRu: hit.title?.russian || '',
+                        titleOrig: hit.title?.original || '',
+                        year: String(hit.productionYear ?? hit.releaseYears?.start ?? hit.releaseYears?.end ?? ''),
+                        type: hit.__typename || 'Film',
+                    };
+                    const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
+                    const conf = confidenceLabel(score);
+                    if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                        const result = { ...cand, score, confidence: conf };
+                        searchCache.set(cacheKey, result);
+                        DEBUG && console.log(`[mrs] KP search HIGH: "${title}" (${year}) → kpId=${cand.kpId} score=${score.toFixed(2)}`);
+                        return result;
                     }
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                }
+                if (best && best.confidence === 'high' && (!year || !best.year || yearsMatch(best.year, year))) {
+                    searchCache.set(cacheKey, best);
+                    return best;
                 }
             }
 
             // --- Phase 2: HTML fallback ---
             // NOTE: /index.php?kp_query= endpoint may be deprecated by Yandex.
             // If this stops working, GQL Suggest (Phase 1) is the primary search method.
-            if (deep || !best || best.confidence !== 'high') {
-                for (const q of variants) {
+            // Only worth paying when Suggest produced nothing usable, and only
+            // for the first few spellings: ten variants × one page each was the
+            // slowest path in a whole KP import.
+            if (!kpHtmlBreaker.open && (deep || !best || best.confidence !== 'high')) {
+                const maxQueries = deep ? variants.length : Math.min(variants.length, 2);
+                for (const q of variants.slice(0, maxQueries)) {
+                    if (kpHtmlBreaker.open) break;
                     try {
                         const r = await fetchT(`https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(q)}`);
-                        if (!r?.ok) continue;
+                        if (!r?.ok) {
+                            if (kpHtmlBreaker.fail()) console.warn('[mrs] KP HTML search disabled for this run after repeated failures');
+                            continue;
+                        }
+                        kpHtmlBreaker.ok();
                         const html = await r.text();
+                        // The endpoint now often answers 200 with an anti-bot stub
+                        // (<body></body> + `var it = {...}`) instead of results.
+                        // Parsing it yields nothing, but each such page still costs
+                        // ~1.5 s per spelling — treat it as a failed fallback so the
+                        // breaker can switch the dead path off for this run.
+                        const isAntiBot = !/href="\/(?:film|series)\/\d+"/.test(html) && /var it =|ss\./i.test(html);
                         const matches = [...html.matchAll(/<a[^>]+href="\/(?:film|series)\/(\d+)"[^>]*>([^<]+)</g)];
+                        if (!matches.length || isAntiBot) {
+                            if (kpHtmlBreaker.fail()) console.warn('[mrs] KP HTML search disabled for this run (endpoint returns no results)');
+                            continue;
+                        }
                         const seen = new Set();
                         for (const [, id, text] of matches) {
                             if (seen.has(id)) continue;
@@ -1761,11 +1918,11 @@
                             };
                             const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
                             const conf = confidenceLabel(score);
-                            if (conf === 'high') {
-                                DEBUG && console.log(`[mrs] KP HTML HIGH confidence: "${title}" (${year}) → kpId=${id} score=${score.toFixed(2)}`);
-                                if (!year || !cand.year || yearsMatch(cand.year, year)) {
-                                    return { ...cand, score, confidence: conf };
-                                }
+                            if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                                const result = { ...cand, score, confidence: conf };
+                                searchCache.set(cacheKey, result);
+                                DEBUG && console.log(`[mrs] KP HTML HIGH: "${title}" (${year}) → kpId=${id} score=${score.toFixed(2)}`);
+                                return result;
                             }
                             if (!best || score > best.score) best = { ...cand, score, confidence: conf };
                         }
@@ -1776,23 +1933,30 @@
             if (best) {
                 DEBUG && console.log(`[mrs] KP search best: "${title}" (${year}) → kpId=${best.kpId} score=${best.score.toFixed(2)} conf=${best.confidence}`);
                 const yearOk = !best.year || !year || yearsMatch(best.year, year);
-                if (deep && best.confidence !== 'low' && yearOk) return best;
-                if (!deep && yearOk && (best.confidence === 'high' || best.confidence === 'medium' || (best.confidence === 'low' && best.score >= 350))) return best;
+                if (yearOk && (best.confidence === 'high'
+                    || (deep && best.confidence !== 'low')
+                    || (best.confidence === 'medium')
+                    || (best.confidence === 'low' && best.score >= 350))) {
+                    searchCache.set(cacheKey, best);
+                    return best;
+                }
             }
 
             // Try matching the parent series for episode titles
             const parent = extractSeriesParent(title);
             if (parent && parent !== title) {
                 DEBUG && console.log(`[mrs] KP trying series parent: "${parent}" for "${title}"`);
-                return searchKPId(parent, year, deep);
+                const parentResult = await searchKPId(parent, year, deep);
+                if (parentResult) { searchCache.set(cacheKey, parentResult); return parentResult; }
             }
 
             console.warn(`[mrs] KP search FAILED: "${title}" (${year})`);
+            _kpNeg.set(cacheKey, Date.now());
             return null;
         });
     }
 
-    async function applyKP(kpId, rating, favorite) {
+    async function applyKP(kpId, rating) {
         const hasR = rating != null && String(rating) !== '' && +rating >= 1 && +rating <= 10;
         const op = hasR ? 'MovieSetVote' : 'MovieSetWatched';
         const vars = hasR ? { movieId: +kpId, rate: +rating } : { movieId: +kpId };
@@ -1811,21 +1975,11 @@
         const ok = r && !r.error;
         if (ok) DEBUG && console.log(`[mrs] KP apply OK: kpId=${kpId} rating=${rating} → ${hasR ? 'rated' : 'watched'}`);
         if (!ok) return null;
-        const baseStatus = hasR ? 'rated' : 'watched';
-        if (favorite) {
-            try {
-                const favJson = await kpGql(KP_FAVORITE_MUT, { movieId: +kpId }, 'SetMovieFavorite');
-                const favOk = favJson?.data?.movie?.favorite?.set && !favJson?.data?.movie?.favorite?.set?.error;
-                if (favOk) DEBUG && console.log(`[mrs] KP favorite OK: kpId=${kpId}`);
-                else console.warn(`[mrs] KP favorite MAY FAIL: kpId=${kpId}`, favJson);
-            } catch (e) {
-                console.warn(`[mrs] KP favorite error: kpId=${kpId}`, e.message);
-            }
-        }
-        return baseStatus;
+        return hasR ? 'rated' : 'watched';
     }
 
     async function kpFetchRatings(statusEl) {
+        const el = statusEl;
         const uid = await resolveKPUserId(statusEl);
         if (!uid) {
             setStatus(statusEl, t('userIdWarn'));
@@ -1836,9 +1990,11 @@
         // Title index lets the importer recognise an already-rated film BEFORE
         // paying for a network search — with 899 items that was most of the time.
         const byTitle = new Map();
+        let seen = 0;
         const indexItem = (item) => {
             if (!item.kpId || map.has(item.kpId)) return;
             map.set(item.kpId, item.rating != null ? item.rating : 'watched');
+            seen++;
             // Index every spelling we know: the profile page carries the Russian
             // title while a CSV row may carry the original one, and a key that is
             // missing here silently costs a network search.
@@ -1847,9 +2003,12 @@
                 if (k && !byTitle.has(k)) byTitle.set(k, item.kpId);
             }
         };
+        const chExisting = channelWriter(el, 'kpExisting', t('lblExisting'));
+        const report = (done, total) => chExisting(`${t('page')} ${done}/${total}`,
+            { current: done, total, extra: `${seen} ${t('movies')}` });
         let totalPages = 0;
         // Fetch page 1 first to discover totalPages
-        setStatus(statusEl, t('loadingExisting', { p: 1, total: '', count: 0 }) + dots());
+        chExisting(`${t('page')} 1`, { extra: `${seen} ${t('movies')}` });
         {
             const { doc } = await fetchDocTimed(`${baseUrl}/?page=1`);
             if (doc) {
@@ -1863,18 +2022,27 @@
         if (totalPages > 1) {
             const pageNums = [];
             for (let p = 2; p <= totalPages; p++) pageNums.push(p);
+            let pagesDone = 1;
             const results = await asyncPool(10, pageNums, async (p) => {
-                const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
-                if (!doc) return [];
-                return parseKPListingPage(doc);
+                try {
+                    const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
+                    if (!doc) return [];
+                    return parseKPListingPage(doc);
+                } finally {
+                    pagesDone++;
+                    if (pagesDone % 3 === 0 || pagesDone >= totalPages) report(pagesDone, totalPages);
+                }
             });
             for (const r of results) {
                 if (r.status === 'fulfilled' && r.value) {
                     for (const item of r.value) indexItem(item);
                 }
             }
-            setStatus(statusEl, t('loadingExisting', { p: totalPages, total: '/' + totalPages, count: map.size }));
+            report(Math.max(1, totalPages), Math.max(1, totalPages));
+        } else {
+            report(1, 1);
         }
+        finishChannel(el, 'kpExisting', seen > 0, true);
         map.byTitle = byTitle;
         return map;
     }
@@ -1890,18 +2058,24 @@
     }
 
     async function runKPImportBatch(items, statusEl, mode, deep = false, opts = {}) {
+        const el = statusEl;
         Object.assign(kpGqlProbe, makeProbe(30, PLATFORM_MAX.kpGql));
         kpGqlDelay.val = DELAY.GQL_INIT;
-        setStatus(statusEl, t('loadedRecords', { count: items.length, next: mode === 'normal' ? t('checkingExisting') : t('startingImport') }) + dots());
+        setTitle(el, `${items.length} ${t('movies')}`);
         const existing = mode === 'normal' && !deep ? await kpFetchRatings(statusEl) : new Map();
         let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0, favCount = 0;
         const missed = [];
         const skippedFavIds = [];
+        const appliedFavIds = [];
         let cur = 0;
+        // The loop searches and applies per item, so it is one phase; its row
+        // fills to completion and stays on screen while favorites are applied.
+        const chApply = channelWriter(el, 'kpApply', t('lblApply'));
 
         while (cur < items.length) {
             const slice = items.slice(cur, cur + kpGqlProbe.c);
-            setStatus(statusEl, t('importProgress', { platform: 'Kinopoisk', from: cur + 1, to: Math.min(cur + kpGqlProbe.c, items.length), total: items.length }) + dots());
+            const to = Math.min(cur + kpGqlProbe.c, items.length);
+            chApply(`${cur + 1}–${to}/${items.length}`, { current: to, total: items.length, extra: `${rated} ${t('rated')}` });
             const res = await asyncPool(kpGqlProbe.c, slice, async item => {
                 const hasR0 = item.rating != null && +item.rating >= 1 && +item.rating <= 10;
                 const canSkip = mode === 'normal' && existing.size > 0;
@@ -1935,43 +2109,59 @@
                     if (opts.importFavorites && item.favorite) skippedFavIds.push(kpResult.kpId);
                     return 'skipped';
                 }
-                const appResult = await applyKP(kpResult.kpId, item.rating, opts.importFavorites && item.favorite);
-                if (appResult && opts.importFavorites && item.favorite) return 'rated+fav';
+                // Favorites are applied later, in one parallel phase, instead of
+                // a second serial mutation inside every worker.
+                const appResult = await applyKP(kpResult.kpId, item.rating);
+                if (appResult && opts.importFavorites && item.favorite) {
+                    appliedFavIds.push(kpResult.kpId);
+                    return 'rated+fav';
+                }
                 return appResult ?? 'failed';
             });
             const t0 = Date.now();
-            let fail = false;
+            let fail = 0;
             res.forEach((r, j) => {
                 const s = r.status === 'fulfilled' ? r.value : 'failed';
-                if (s === 'rated' || s === 'rated+fav') {
-                    rated++;
-                    if (s === 'rated+fav') favCount++;
-                }
+                if (s === 'rated' || s === 'rated+fav') rated++;
                 else if (s === 'watched') watched++;
                 else if (s === 'skipped') skipped++;
                 else if (s === 'notfound') { notFound++; missed.push({ ...slice[j], error: t('errorNotFoundKP') }); }
-                else { failed++; missed.push({ ...slice[j], error: t('errorApi') }); fail = true; }
+                else { failed++; missed.push({ ...slice[j], error: t('errorApi') }); fail++; }
             });
             cur += kpGqlProbe.c;
             const elapsed = Date.now() - t0;
-            fail ? probeFail(kpGqlProbe) : probeOk(kpGqlProbe, elapsed);
+            // "Not found" is normal and must not shrink concurrency; only a
+            // batch where most writes actually failed should slow us down.
+            fail / slice.length >= 0.5 ? probeFail(kpGqlProbe) : probeOk(kpGqlProbe, elapsed);
             // No artificial sleep between batches
         }
-        // Apply favorites for skipped items
-        if (opts.importFavorites && skippedFavIds.length) {
-            setStatus(statusEl, 'Applying favorites for skipped films...' + dots());
-            for (const kpId of skippedFavIds) {
+        finishChannel(el, 'kpApply', failed === 0, true);
+        // Favorites: one parallel phase for both the skipped films (rating kept
+        // as-is, only the heart was missing) and the newly applied ones. The old
+        // code sent the heart as a second serial mutation inside every worker,
+        // then walked the skipped list one id per 200 ms.
+        const favIds = [...new Set([...skippedFavIds, ...appliedFavIds])];
+        if (opts.importFavorites && favIds.length) {
+            const chFav = channelWriter(el, 'kpFavorites', t('lblFavorites'));
+            let favDone = 0;
+            favDone = (skippedFavIds.length + appliedFavIds.length) - favIds.length;
+            const favReport = () => chFav(`${favDone}/${favIds.length}`, { current: favDone, total: favIds.length });
+            favReport();
+            await asyncPool(6, favIds, async kpId => {
                 try {
                     const favJson = await kpGql(KP_FAVORITE_MUT, { movieId: +kpId }, 'SetMovieFavorite');
                     if (favJson?.data?.movie?.favorite?.set && !favJson?.data?.movie?.favorite?.set?.error) {
                         favCount++;
-                        if (favCount <= 5 || favCount % 20 === 0) DEBUG && console.log(`[mrs] KP favorite OK (skipped): kpId=${kpId}`);
+                        if (favCount <= 5 || favCount % 20 === 0) DEBUG && console.log(`[mrs] KP favorite OK: kpId=${kpId}`);
                     }
                 } catch (e) {
-                    console.warn(`[mrs] KP favorite error (skipped): kpId=${kpId}`, e.message);
+                    console.warn(`[mrs] KP favorite error: kpId=${kpId}`, e.message);
                 }
-                await sleep(200);
-            }
+                favDone++;
+                if (favDone % 5 === 0 || favDone === favIds.length) favReport();
+            });
+            favReport();
+            finishChannel(el, 'kpFavorites', true, true);
         }
         return { rated, watched, skipped, notFound, failed, missed, favorites: favCount };
     }
@@ -1995,7 +2185,7 @@
                 textContent: t('deepSearchBtn', { count: result.missed.length }),
             });
             btn.addEventListener('click', async () => {
-                setStatus(statusEl, t('deepSearch', { platform: 'Kinopoisk' }) + dots());
+                beginRun(statusEl, t('deepSearch', { platform: 'Kinopoisk' }));
                 const r2 = await runKPImportBatch(result.missed, statusEl, mode, true, getImportOptions());
                 renderKPResult(r2, statusEl, mode);
             });
@@ -2009,9 +2199,14 @@
     async function performKPImport(csvData, statusEl, mode, deep = false, opts = {}) {
         const items = parseCSV(csvData);
         if (!items.length) return setStatus(statusEl, t('csvEmpty'));
-        const t0 = Date.now();
-        const result = await runKPImportBatch(items, statusEl, mode, false, opts);
-        result.elapsedMs = Date.now() - t0;
+        beginRun(statusEl, `${items.length} ${t('movies')}`);
+        const started = Date.now();
+        // `deep` must reach the batch: it decides whether the existing profile is
+        // loaded for skipping and how many spellings the search may try. It used
+        // to be hard-coded to false, so the "deep search missed" retry silently
+        // ran as a normal import and skipped everything it was meant to find.
+        const result = await runKPImportBatch(items, statusEl, mode, deep, opts);
+        result.elapsedMs = Date.now() - started;
         renderKPResult(result, statusEl, mode);
     }
 
@@ -2076,10 +2271,16 @@
     // Walk a paginated IMDb listing sequentially. A failed page is retried and,
     // if it still fails, SKIPPED with a visible warning instead of silently
     // truncating the whole history (which used to look like a hang).
-    async function scanIMDb(uid, urlFn, label, statusEl, set) {
+    // `channel` (optional) makes the walk own a status row that fills up.
+    async function scanIMDb(uid, urlFn, label, statusEl, set, channel) {
         let failed = 0;
-        for (let p = 1; p <= RETRY.PAGES; p++) {
-            setStatus(statusEl, `${label} ${t('page')} ${p}/${RETRY.PAGES}` + ` · ✓ ${set?.size ?? 0}` + dots());
+        const write = channel ? channelWriter(statusEl, channel, label) : null;
+        const count = () => `${set?.size ?? 0} ${t('movies')}`;
+        let p = 1;
+        for (; p <= RETRY.PAGES; p++) {
+            const text = `${t('page')} ${p}/${RETRY.PAGES}`;
+            if (write) write(text, { extra: count() });
+            else setStatus(statusEl, `${label} ${text} · ✓ ${set?.size ?? 0}` + dots());
             let nd = null, lastErr = null;
             for (let attempt = 1; attempt <= RETRY.FETCH; attempt++) {
                 try {
@@ -2096,7 +2297,8 @@
                     // Transport failure: skip this page, keep going.
                     failed++;
                     console.warn(`[mrs] ${label} page ${p} failed after ${RETRY.FETCH} attempts:`, lastErr?.message ?? lastErr);
-                    setStatus(statusEl, `${label} ${t('page')} ${p}/${RETRY.PAGES} · ⚠️ ${failed} skipped` + dots());
+                    if (write) write(text, { extra: `⚠️ ${failed}` });
+                    else setStatus(statusEl, `${label} ${text} · ⚠️ ${failed} skipped` + dots());
                     await sleep(Math.max(15, DELAY.HISTORY_PAGE - 20));
                     continue;
                 }
@@ -2104,10 +2306,16 @@
             }
             const search = nd?.props?.pageProps?.mainColumnData?.advancedTitleSearch;
             const edges = search?.edges ?? [];
-            if (!edges.length) break;
+            if (!edges.length) { p--; break; }
             parseEdges(edges, set);
             if (!search?.pageInfo?.hasNextPage) break;
             await sleep(Math.max(15, DELAY.HISTORY_PAGE - 20));
+        }
+        if (channel) {
+            const done = Math.max(1, Math.min(p - 1, RETRY.PAGES));
+            const tail = failed ? `⚠️ ${failed}` : count();
+            channelWriter(statusEl, channel)(`${t('page')} ${done}`, { extra: tail });
+            finishChannel(statusEl, channel, failed === 0 && (set?.size ?? 0) > 0, true);
         }
         if (failed) {
             console.warn(`[mrs] ${label}: ${failed} page(s) skipped — the resulting list may be incomplete`);
@@ -2117,15 +2325,19 @@
 
     async function getIMDbHistory(statusEl) {
         if (imdbHistory) return imdbHistory;
-        setStatus(statusEl, t('profileDetect', { platform: 'IMDb' }) + dots());
+        setTitle(statusEl, t('lblHistory'));
         const uid = getIMDbUid();
         if (!uid) {
             setStatus(statusEl, t('imdbUserIdNotFound'));
             return imdbHistory = { rated: new Set(), watched: new Set() };
         }
         const rated = new Set(), watched = new Set();
-        const f1 = await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings'), statusEl, rated);
-        const f2 = await scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory'), statusEl, watched);
+        // Two independent listings, two independent rows: fetching them one
+        // after the other doubled the wait before the first film was imported.
+        const [f1, f2] = await Promise.all([
+            scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings'), statusEl, rated, 'imdbHistRated'),
+            scanIMDb(uid, (u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory'), statusEl, watched, 'imdbHistWatched'),
+        ]);
         const failed = (f1 || 0) + (f2 || 0);
         // Keep the warning visible until the next status update: a silently
         // truncated history looks like a bug to the user.
@@ -2303,7 +2515,7 @@
         return __imdbFavCache;
     }
 
-    async function applyIMDb(ttId, rating, rated, watched, favorite) {
+    async function applyIMDb(ttId, rating, rated, watched) {
         const hasR = rating != null && String(rating) !== '' && +rating >= 1 && +rating <= 10;
         let status = null;
         if (hasR) {
@@ -2312,23 +2524,6 @@
         } else {
             const j = await imdbGql(GQL_WATCH, { titleId: ttId });
             if (j?.data?.addWatchedTitle?.success) { watched.add(ttId); status = 'watched'; }
-        }
-        if (favorite && status) {
-            const listId = await getOrCreateIMDbFavouritesList();
-            if (listId) {
-                try {
-                    const cache = await getIMDbFavCache(listId);
-                    if (cache.ids.has(ttId)) {
-                        DEBUG && console.log(`[mrs] IMDb favorite skip (already in list): ${ttId}`);
-                    } else {
-                        const j = await imdbGql(GQL_ADD_TO_LIST, { input: { listId, item: { itemElementId: ttId } } });
-                        if (j?.data?.addItemToList?.listId) {
-                            cache.ids.add(ttId);
-                            DEBUG && console.log(`[mrs] IMDb favorite OK: ${ttId}`);
-                        }
-                    }
-                } catch (e) { console.warn(`[mrs] IMDb favorite error: ${ttId}`, e.message); }
-            }
         }
         return status;
     }
@@ -2599,8 +2794,12 @@
             }
             const suggestCandidates = [];
             const seenSugg = new Set();
-            for (const q of [...new Set(suggestQueries)]) {
-                const cands = await searchIMDbSuggest(q);
+            // The Suggest endpoint is independent per spelling, and each call is
+            // ~500 ms of pure latency. Sequentially probing 4 spellings for every
+            // unresolved title was the single largest cost of an IMDb import.
+            const uniqQueries = [...new Set(suggestQueries)].slice(0, 4);
+            const suggestLists = await Promise.all(uniqQueries.map(q => searchIMDbSuggest(q).catch(() => [])));
+            for (const cands of suggestLists) {
                 for (const c of cands) {
                     if (seenSugg.has(c.ttId)) continue;
                     seenSugg.add(c.ttId);
@@ -2631,10 +2830,22 @@
             const maxQueries = deep ? qs.length : Math.min(qs.length, 3);
 
             for (const q of qs.slice(0, maxQueries)) {
+                if (imdbHtmlBreaker.open) break;
                 const r = await fetchT(`https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt`);
-                if (!r) continue;
-                if (r.status === 429) { await sleep(1200 + Math.random() * 800); continue; }
-                if (!r.ok) continue;
+                if (!r || r.status === 429 || !r.ok) {
+                    // 5xx/timeouts used to be a silent `continue`, which burned
+                    // a timeout per variant and — worse — turned a broken search
+                    // into "not found", losing the rating. Count them, and if
+                    // the endpoint is systemically down stop paying for it for
+                    // the rest of the run; a 429 still backs off and retries.
+                    if (r?.status === 429) { await sleep(1200 + Math.random() * 800); continue; }
+                    if (imdbHtmlBreaker.fail()) {
+                        console.warn('[mrs] IMDb HTML search disabled for this run after repeated failures');
+                        break;
+                    }
+                    continue;
+                }
+                imdbHtmlBreaker.ok();
                 const html = await r.text();
                 const ids = [...new Set([...html.matchAll(/\/title\/(tt\d+)/g)].map(m => m[1]))];
                 if (!ids.length) continue;
@@ -2745,45 +2956,68 @@
         }
 
         let cur = 0;
+        const chApply = channelWriter(statusEl, 'imdbApply', t('lblApply'));
         while (cur < toApply.length) {
             const slice = toApply.slice(cur, cur + gqlProbe.c);
-            setStatus(statusEl, t('importProgress', { platform: 'IMDb', from: cur + 1, to: Math.min(cur + gqlProbe.c, toApply.length), total }) + dots());
+            const to = Math.min(cur + gqlProbe.c, toApply.length);
+            chApply(`${cur + 1}–${to}/${toApply.length}`, { current: to, total: toApply.length });
             const t0 = Date.now();
-            const res = await asyncPool(gqlProbe.c, slice, ({ item, ttId }) => applyIMDb(ttId, item.rating, rated, watched, opts.importFavorites && item.favorite));
-            let fail = false;
+            const res = await asyncPool(gqlProbe.c, slice, ({ item, ttId }) => applyIMDb(ttId, item.rating, rated, watched));
+            let fail = 0;
             res.forEach((x, j) => {
                 const s = x.status === 'fulfilled' ? x.value : null;
                 const item = slice[j].item;
                 if (s === 'rated') r++;
                 else if (s === 'watched') w++;
-                else { fa++; missed.push({ ...item, error: t('errorApi') }); fail = true; }
-                if (item.favorite && (s === 'rated' || s === 'watched')) fav++;
+                else { fa++; missed.push({ ...item, error: t('errorApi') }); fail++; }
             });
             cur += gqlProbe.c;
             const elapsed = Date.now() - t0;
-            fail ? probeFail(gqlProbe) : probeOk(gqlProbe, elapsed);
+            // Only a mostly-failing batch means the endpoint is overloaded; a
+            // single rejected write must not cut concurrency for the rest of the run.
+            fail / slice.length >= 0.5 ? probeFail(gqlProbe) : probeOk(gqlProbe, elapsed);
             // No artificial sleep — asyncPool naturally paces requests
         }
+        if (toApply.length) chApply(`${toApply.length}/${toApply.length}`, { current: toApply.length, total: toApply.length });
+        finishChannel(statusEl, 'imdbApply', fa === 0, true);
 
-        // Add favorites for skipped (already-rated) films
-        if (skippedFavs.length) {
+        // Favorites: one parallel phase covering both the films rated just now
+        // and those skipped because they were already rated. The old code added
+        // the heart as a second serial GQL call inside every apply worker (plus
+        // a one-at-a-time loop over skipped films), which for a big library was
+        // a full extra round-trip per favorite.
+        const favIds = [];
+        if (opts.importFavorites) {
+            for (const { item, ttId } of toApply) if (item.favorite) favIds.push(ttId);
+            for (const { ttId } of skippedFavs) favIds.push(ttId);
+        }
+        const uniqueFavs = [...new Set(favIds)];
+        if (uniqueFavs.length) {
             const listId = await getOrCreateIMDbFavouritesList();
             if (listId) {
+                const chFav = channelWriter(statusEl, 'imdbFavorites', t('lblFavorites'));
+                let favDone = 0;
+                let favFails = 0;
+                const favReport = () => chFav(`${favDone}/${uniqueFavs.length}`, { current: favDone, total: uniqueFavs.length });
+                favReport();
                 try {
                     const cache = await getIMDbFavCache(listId);
-                    for (const { ttId } of skippedFavs) {
-                        if (!cache.ids.has(ttId)) {
-                            const j = await imdbGql(GQL_ADD_TO_LIST, { input: { listId, item: { itemElementId: ttId } } });
-                            if (j?.data?.addItemToList?.listId) {
-                                cache.ids.add(ttId);
-                                fav++;
-                                DEBUG && console.log(`[mrs] IMDb favorite OK (skipped film): ${ttId}`);
-                            }
-                        } else {
-                            DEBUG && console.log(`[mrs] IMDb favorite skip (already in list): ${ttId}`);
-                        }
-                    }
-                } catch (e) { console.warn(`[mrs] IMDb favorite error for skipped films:`, e.message); }
+                    const todo = uniqueFavs.filter(id => !cache.ids.has(id));
+                    favDone = uniqueFavs.length - todo.length;
+                    favReport();
+                    await asyncPool(8, todo, async ttId => {
+                        const j = await imdbGql(GQL_ADD_TO_LIST, { input: { listId, item: { itemElementId: ttId } } });
+                        if (j?.data?.addItemToList?.listId) {
+                            cache.ids.add(ttId);
+                            fav++;
+                            DEBUG && console.log(`[mrs] IMDb favorite OK: ${ttId}`);
+                        } else favFails++;
+                        favDone++;
+                        if (favDone % 10 === 0 || favDone === uniqueFavs.length) favReport();
+                    });
+                } catch (e) { console.warn(`[mrs] IMDb favorite error:`, e.message); }
+                favReport();
+                finishChannel(statusEl, 'imdbFavorites', favFails === 0, true);
             }
         }
 
@@ -2794,6 +3028,9 @@
         Object.assign(imdbProbe, makeProbe(30, PLATFORM_MAX.imdb));
         const resolved = [];
         let cur = 0, done = 0, found = 0, lastReport = 0;
+        // One row for the whole search phase. It must fill to completion while
+        // the apply phase below appends its own row.
+        const chSearch = channelWriter(statusEl, 'imdbSearch', t('lblSearch'));
         // Report steady per-title progress, not just once per batch. Users see a
         // frozen "1–20/6790" otherwise, because a batch can take minutes.
         const report = (force) => {
@@ -2801,9 +3038,12 @@
             if (!force && now - lastReport < 250) return;
             lastReport = now;
             const to = Math.max(done, 1);
-            setStatus(statusEl, t('searchProgress', { from: 1, to, total: items.length }) + ` · ✓ ${found}` + dots(), { current: to, total: items.length });
+            chSearch(`${to}/${items.length}`, { current: to, total: items.length, extra: `✓ ${found}` });
         };
-        const itemBudget = deep ? 60000 : 30000;
+        // 15 s is already several times the real worst case (3 suggest spellings
+        // + 3 HTML fallbacks); the old 30–60 s budget meant one hung request held
+        // a whole batch hostage.
+        const itemBudget = deep ? 45000 : 15000;
         while (cur < items.length) {
             const chunkSize = Math.max(1, imdbProbe.c);
             const slice = items.slice(cur, cur + chunkSize);
@@ -2821,27 +3061,28 @@
                 report(false);
                 return result;
             });
-            let fail = false, empty = 0;
+            let errs = 0;
             res.forEach((r, j) => {
                 const result = r.status === 'fulfilled' ? r.value : null;
+                if (r.status === 'rejected') errs++;
                 const ttId = result?.ttId ?? null;
                 const confidence = result?.confidence ?? 'low';
                 if (!ttId || confidence === 'low') {
                     resolved.push({ item: slice[j], ttId: null });
-                    empty++;
-                    if (deep) fail = true;
                 } else {
                     resolved.push({ item: slice[j], ttId });
                 }
             });
             cur += chunkSize;
             const elapsed = Date.now() - t0;
-            // IMDb throttles hard at high concurrency. Shrink the batch when many
-            // titles fail, even in normal mode, instead of hammering at max speed.
-            if (empty / slice.length >= 0.5) fail = true;
-            fail ? probeFail(imdbProbe) : probeOk(imdbProbe, elapsed);
+            // A title that simply has no IMDb entry is a normal outcome and must
+            // never throttle the run; only thrown (network/endpoint) errors mean
+            // the gateway is pushing back.
+            errs / slice.length >= 0.5 ? probeFail(imdbProbe) : probeOk(imdbProbe, elapsed);
             report(true);
         }
+        chSearch(`${items.length}/${items.length}`, { current: items.length, total: items.length, extra: `✓ ${found}` });
+        finishChannel(statusEl, 'imdbSearch', found > 0, true);
         return imdbApplyPhase(resolved, rated, watched, statusEl, mode, items.length, opts);
     }
 
@@ -2864,7 +3105,7 @@
                 textContent: t('deepSearchBtn', { count: result.missed.length }),
             });
             btn.addEventListener('click', async () => {
-                setStatus(statusEl, t('deepSearch', { platform: 'IMDb' }) + dots());
+                beginRun(statusEl, t('deepSearch', { platform: 'IMDb' }));
                 const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode, getImportOptions());
                 renderIMDbResult(r2, statusEl, rated, watched, mode);
             });
@@ -2886,21 +3127,26 @@
     }
 
     async function performIMDbExport(statusEl) {
-        setStatus(statusEl, t('profileDetect', { platform: 'IMDb' }) + dots());
+        const el = statusEl;
+        beginRun(el, t('profileDetect', { platform: 'IMDb' }));
         const uid = getIMDbUid();
         if (!uid) throw new Error(t('imdbUserIdNotFound'));
         // Optional warm-up probe. IMDb's gateway intermittently throttles the
-        // first request of a session; that is not an error worth showing.
+        // first request of a session; that is not an error worth reporting.
         imdbHealthCheck().then(ok => { if (!ok) console.info('[mrs] IMDb probe skipped — export continues with per-request retries'); });
         resetTitleMap(); imdbHistory = null;
 
         const HASH = '7c4e0771d67f21fc27fd44fc46d49cc589225a9c5e63e51cc0b8d42f39ee99cc';
         const seen = new Set();
 
-        const scan = async (urlFn, label) => {
+        // Two independent listings, so two rows that fill side by side. IMDb
+        // does not expose the page count up front: the row shows the page being
+        // fetched and the number of titles already collected.
+        const scan = async (urlFn, label, channel) => {
+            const write = channelWriter(el, channel, label);
             const items = [];
             for (let p = 1; p <= RETRY.PAGES; p++) {
-                setStatus(statusEl, `${label} ${t('page')} ${p}${dots()}`);
+                write(`${t('page')} ${p}`, { extra: `${items.length} ${t('movies')}` });
                 const nd = await fetchNextData(urlFn(uid, p));
                 if (!nd) break;
                 const s = nd?.props?.pageProps?.mainColumnData?.advancedTitleSearch;
@@ -2924,13 +3170,15 @@
                 if (!s?.pageInfo?.hasNextPage) break;
                 await sleep(DELAY.HISTORY_PAGE);
             }
+            write(`${t('page')} ${Math.max(1, p - 1)}`, { extra: `${items.length} ${t('movies')}` });
+            finishChannel(el, channel, items.length > 0, true);
             return items;
         };
 
         // Parallelize ratings + watch history scanning
         const [rated, watched] = await Promise.all([
-            scan((u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings')),
-            scan((u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory')),
+            scan((u, p) => `https://www.imdb.com/user/${u}/ratings/?page=${p}`, t('ratings'), 'imdbExportRatings'),
+            scan((u, p) => `https://www.imdb.com/user/${u}/watchhistory/?my_ratings=exclude&page=${p}`, t('watchHistory'), 'imdbExportWatched'),
         ]);
 
         // Check if any data was found
@@ -2988,17 +3236,26 @@
 
         // Fetch film details (titles + extended metadata) from IMDb film pages
         const uniqueItems = [...itemMap.values()];
-        setStatus(statusEl, t('fetchingLid', { count: uniqueItems.length }), { current: 0, total: uniqueItems.length });
+        const chDetails = channelWriter(el, 'imdbDetails', t('lblDetails'));
+        chDetails(`0/${uniqueItems.length}`, { current: 0, total: uniqueItems.length });
         const imdbRateLimit = makeRateLimiter(15);
+        let imdbDetailsDone = 0;
         const titleResults = await asyncPool(25, uniqueItems, async i => {
-            if (!i.ttId) return null;
-            const cacheKey = 'imdb:' + i.ttId;
-            const cached = filmDetailCache.get(cacheKey);
-            if (cached) return cached;
-            await imdbRateLimit();
-            const result = await imdbFetchFilmDetailsHTML(i.ttId);
-            if (result) filmDetailCache.set(cacheKey, result);
-            return result;
+            try {
+                if (!i.ttId) return null;
+                const cacheKey = 'imdb:' + i.ttId;
+                const cached = filmDetailCache.get(cacheKey);
+                if (cached) return cached;
+                await imdbRateLimit();
+                const result = await imdbFetchFilmDetailsHTML(i.ttId);
+                if (result) filmDetailCache.set(cacheKey, result);
+                return result;
+            } finally {
+                imdbDetailsDone++;
+                if (imdbDetailsDone % 5 === 0 || imdbDetailsDone === uniqueItems.length) {
+                    chDetails(`${imdbDetailsDone}/${uniqueItems.length}`, { current: imdbDetailsDone, total: uniqueItems.length });
+                }
+            }
         });
         titleResults.forEach((r, i) => {
             const item = uniqueItems[i];
@@ -3012,6 +3269,8 @@
                 item.premiereDate = r.value.premiereDate;
             }
         });
+        chDetails(`${uniqueItems.length}/${uniqueItems.length}`, { current: uniqueItems.length, total: uniqueItems.length });
+        finishChannel(el, 'imdbDetails', imdbDetailsDone !== 0);
 
         filmDetailCache.flush();
         return buildCSV([...itemMap.values()].map(i => ({ ...i, allTitles: [...new Set([i.titleOrig, i.titleRu, ...(i.allTitles || [])].filter(Boolean))], src: 'imdb' })));
@@ -3026,7 +3285,7 @@
         const uid = getIMDbUid();
         if (!uid) return setStatus(statusEl, t('imdbUserIdNotFound'));
 
-        setStatus(statusEl, t('loadedRecords', { count: items.length, next: t('scanHistory', { platform: 'IMDb' }) }) + dots());
+        beginRun(statusEl, `${items.length} ${t('movies')}`);
         // Skip history scan if importing items without IMDb IDs (e.g. from Letterboxd)
         let rated, watched;
         ({ rated, watched } = await getIMDbHistory(statusEl));
@@ -3683,25 +3942,26 @@
 
         // One row per source: each row owns its own channel and never fights
         // another one for the same line, so nothing flickers.
-        const chRatings = channelWriter(el, t('ratings'));
-        const chDiary = channelWriter(el, t('diary'));
-        const chWatched = channelWriter(el, t('watched'));
-        const chLikes = channelWriter(el, t('likes'));
+        beginRun(el, `${t('profileDetect', { platform: 'Letterboxd' })}`.trim());
+        const chRatings = channelWriter(el, 'lbRatings', t('ratings'));
+        const chDiary = channelWriter(el, 'lbDiary', t('diary'));
+        const chWatched = channelWriter(el, 'lbWatched', t('watched'));
+        const chLikes = channelWriter(el, 'lbLikes', t('likes'));
         const scrape = (write, pathFn, parseFn) => lbScrapePages(username, pathFn, parseFn, 200,
             (done, total) => write(`${t('page')} ${done}/${total}`, { current: done, total }));
         const settle = (channel, p) => p.then(
-            (value) => { finishChannel(el, channel, true); return value; },
+            (value) => { finishChannel(el, channel, true, true); return value; },
             (err) => { finishChannel(el, channel, false); throw err; }
         );
         const started = Date.now();
         const [ratings, diary, watched, liked] = await Promise.all([
-            settle(t('ratings'), scrape(chRatings, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings)),
-            settle(t('diary'), scrape(chDiary, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/diary/` : `https://letterboxd.com/${u}/films/diary/page/${p}/`, parseLBDiary)),
-            settle(t('watched'), scrape(chWatched, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched)),
-            settle(t('likes'), scrape(chLikes, (u, p) => p === 1 ? `https://letterboxd.com/${u}/likes/` : `https://letterboxd.com/${u}/likes/page/${p}/`, parseLBWatched)
+            settle('lbRatings', scrape(chRatings, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings)),
+            settle('lbDiary', scrape(chDiary, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/diary/` : `https://letterboxd.com/${u}/films/diary/page/${p}/`, parseLBDiary)),
+            settle('lbWatched', scrape(chWatched, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched)),
+            settle('lbLikes', scrape(chLikes, (u, p) => p === 1 ? `https://letterboxd.com/${u}/likes/` : `https://letterboxd.com/${u}/likes/page/${p}/`, parseLBWatched)
                 .catch(e => { console.error('[mrs] LB likes scrape failed:', e); return []; })),
         ]);
-        setStatus(el, `${map.size} ${t('movies')}`, { current: 1, total: 1 });
+        setTitle(el, `${map.size} ${t('movies')}`);
         void started;
 
         merge(ratings);
@@ -3711,7 +3971,8 @@
 
         // Fetch film details for films in parallel
         const uniqueItems = [...map.values()];
-        setStatus(el, `Fetching film details: 0/${uniqueItems.length}`, { current: 0, total: uniqueItems.length });
+        const chDetails = channelWriter(el, 'lbDetails', t('lblDetails'));
+        chDetails(`0/${uniqueItems.length}`, { current: 0, total: uniqueItems.length });
         const lbRateLimit = makeRateLimiter(15);
         let detailsDone = 0;
         const details = await asyncPool(25, uniqueItems, async u => {
@@ -3727,7 +3988,7 @@
             } finally {
                 detailsDone++;
                 if (detailsDone % 5 === 0 || detailsDone === uniqueItems.length) {
-                    setStatus(el, `Fetching film details: ${detailsDone}/${uniqueItems.length}`, { current: detailsDone, total: uniqueItems.length });
+                    chDetails(`${detailsDone}/${uniqueItems.length}`, { current: detailsDone, total: uniqueItems.length });
                 }
             }
         });
@@ -3743,6 +4004,8 @@
                 item.premiereDate = r.value.premiereDate;
             }
         });
+        chDetails(`${uniqueItems.length}/${uniqueItems.length}`, { current: uniqueItems.length, total: uniqueItems.length });
+        finishChannel(el, 'lbDetails', true, true);
         filmDetailCache.flush();
 
         const rows = uniqueItems.map(i => {
@@ -3775,6 +4038,10 @@
     // Letterboxd film lookup: multiple strategies with progressive fallback
     async function lbSearchFilm(title, year, csrfRef, deep = false, allTitles = [], src = {}) {
         const cacheKey = `lb:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}`;
+        const cached = searchCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+        const negTs = _lbNeg.get(cacheKey);
+        if (negTs && Date.now() - negTs < SEARCH_NEG_TTL) return null;
         return dedupeFetch(cacheKey, async () => {
             const variants = deep ? getTitleVariants(title, allTitles) : getTitleVariants(title, allTitles).slice(0, 5);
             const ts = Date.now();
@@ -3820,19 +4087,37 @@
                 return results;
             };
 
-            for (const q of variants) {
+            // In normal mode three spellings are plenty (the title, its cleaned
+            // form and the transliteration); deep mode may use the whole list.
+            const maxAuto = deep ? variants.length : Math.min(variants.length, 3);
+            for (const q of variants.slice(0, maxAuto)) {
                 const items = await tryAutocomplete(q);
                 for (const cand of items) {
                     const score = scoreCandidate({ title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
                     const conf = confidenceLabel(score);
-                    if (conf === 'high') {
+                    if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                        const result = { ...cand, score, confidence: conf };
+                        searchCache.set(cacheKey, result);
                         DEBUG && console.log(`[mrs] LB autocomplete HIGH: "${title}" (${year}) → ${cand.slug} score=${score.toFixed(2)}`);
-                        if (!year || !cand.year || yearsMatch(cand.year, year)) {
-                            return { ...cand, score, confidence: conf };
-                        }
+                        return result;
                     }
                     if (!best || score > best.score) best = { ...cand, score, confidence: conf };
                 }
+                // A confident hit on the primary spelling is enough: every
+                // extra variant costs two autocomplete requests *and* possibly
+                // two HTML search pages.
+                if (best && best.confidence === 'high' && (!year || !best.year || yearsMatch(best.year, year))) {
+                    searchCache.set(cacheKey, best);
+                    return best;
+                }
+            }
+            // Autocomplete is empty or uncertain. Stop here in normal mode when
+            // it already produced a usable medium/low match: the HTML search
+            // below is two full page fetches per spelling and is the single
+            // slowest step of a large Letterboxd import.
+            if (!deep && best && best.confidence !== 'low') {
+                searchCache.set(cacheKey, best);
+                return best;
             }
 
             const tryHtmlSearch = async (q) => {
@@ -3868,16 +4153,21 @@
                 return results;
             };
 
-            for (const q of variants) {
+            const htmlVariants = deep ? variants : variants.slice(0, 2);
+            for (const q of htmlVariants) {
+                if (lbHtmlBreaker.open) break;
                 const items = await tryHtmlSearch(q);
+                if (!items.length) {
+                    if (lbHtmlBreaker.fail()) console.warn('[mrs] LB HTML search disabled for this run after repeated empty answers');
+                } else lbHtmlBreaker.ok();
                 for (const cand of items) {
                     const score = scoreCandidate({ title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
                     const conf = confidenceLabel(score);
-                    if (conf === 'high') {
+                    if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                        const result = { ...cand, score, confidence: conf };
+                        searchCache.set(cacheKey, result);
                         DEBUG && console.log(`[mrs] LB HTML HIGH: "${title}" (${year}) → ${cand.slug} score=${score.toFixed(2)}`);
-                        if (!year || !cand.year || yearsMatch(cand.year, year)) {
-                            return { ...cand, score, confidence: conf };
-                        }
+                        return result;
                     }
                     if (!best || score > best.score) best = { ...cand, score, confidence: conf };
                 }
@@ -3886,20 +4176,59 @@
             if (best) {
                 DEBUG && console.log(`[mrs] LB best: "${title}" (${year}) → ${best.slug} score=${best.score.toFixed(2)} conf=${best.confidence}`);
                 const yearOk = !best.year || !year || yearsMatch(best.year, year);
-                if (deep && best.confidence !== 'low' && yearOk) return best;
-                if (!deep && yearOk && (best.confidence === 'high' || best.confidence === 'medium' || (best.confidence === 'low' && best.score >= 350))) return best;
+                if (yearOk && (best.confidence === 'high'
+                    || (deep && best.confidence !== 'low')
+                    || best.confidence === 'medium'
+                    || (best.confidence === 'low' && best.score >= 350))) {
+                    searchCache.set(cacheKey, best);
+                    return best;
+                }
             }
             console.warn(`[mrs] LB search FAILED: "${title}" (${year})`);
+            _lbNeg.set(cacheKey, Date.now());
             return null;
         });
     }
 
-    // Get film's LID (Letterboxd ID like "2a1m") needed for the API v0 rate endpoint
-    async function lbGetFilmLid(slug, csrfRef) {
+    // Read a film's internal ids from its page: LID (rating API) and numeric
+    // film id (watch / rate / like form endpoints). One page fetch yields both,
+    // and for a slug-only CSV row the numeric id is what enables "watched".
+    async function lbGetFilmIds(slug, csrfRef, filmId = null) {
+        if (!slug && !filmId) return null;
         // Strip tv: prefix if present — it was added by lbSearchFilm to distinguish TV series
-        const isTv = slug.startsWith('tv:');
+        const isTv = !!slug && slug.startsWith('tv:');
         const cleanSlug = isTv ? slug.slice(3) : slug;
-        const paths = isTv ? [`/tv/${cleanSlug}/`] : [`/film/${cleanSlug}/`, `/tv/${cleanSlug}/`];
+        // /film/{id}/ redirects to the slugged page, so it yields the same ids
+        // and stays usable when the form endpoint rejected a filmId-only row.
+        const paths = !slug ? [`/film/${filmId}/`]
+            : isTv ? [`/tv/${cleanSlug}/`]
+                : [`/film/${cleanSlug}/`, `/tv/${cleanSlug}/`];
+        const parseIds = html => {
+            let filmId = null, lid = null;
+            const prodId = html.match(/name="production:identifier"\s+content="([^"]+)"/);
+            if (prodId) {
+                try {
+                    const d = JSON.parse(prodId[1].replace(/&quot;/g, '"'));
+                    if (d?.lid) lid = d.lid;
+                    if (d?.uid) filmId = String(d.uid).replace(/^film:/, '');
+                } catch { /* malformed meta */ }
+            }
+            if (!filmId || !lid) {
+                const jsonId = html.match(/data-postered-identifier='(\{[^']+\})'/);
+                if (jsonId) {
+                    try {
+                        const d = JSON.parse(jsonId[1]);
+                        if (!lid && d?.lid) lid = d.lid;
+                        if (!filmId && d?.uid) filmId = String(d.uid).replace(/^film:/, '');
+                    } catch { /* malformed attribute */ }
+                }
+            }
+            if (!filmId) {
+                const fm = html.match(/data-film-id="(\d+)"/) || html.match(/\bfilm:(\d+)\b/);
+                if (fm) filmId = fm[1];
+            }
+            return (lid || filmId) ? { lid, filmId } : null;
+        };
         for (const path of paths) {
             try {
                 const html = await fetchLBHtml(`https://letterboxd.com${path}`);
@@ -3908,19 +4237,46 @@
                     const csrfInPage = html.match(/supermodelCSRF\s*=\s*['"]([^'"]+)['"]/);
                     if (csrfInPage) csrfRef.val = csrfInPage[1];
                 }
-                // Extract from production:identifier meta tag: {"lid":"2a1m","uid":"film:51518",...}
-                const prodId = html.match(/name="production:identifier"\s+content="([^"]+)"/);
-                if (prodId) {
-                    try { const d = JSON.parse(prodId[1].replace(/&quot;/g, '"')); if (d?.lid) return d.lid; } catch { }
-                }
-                // Extract from data-postered-identifier JSON (React format)
-                const jsonId = html.match(/data-postered-identifier='(\{[^']+\})'/);
-                if (jsonId) {
-                    try { const d = JSON.parse(jsonId[1]); if (d?.lid) return d.lid; } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
-                }
+                const ids = parseIds(html);
+                if (ids) return ids;
             } catch { continue; }
         }
         return null;
+    }
+
+    async function lbGetFilmLid(slug, csrfRef, filmId = null) {
+        const ids = await lbGetFilmIds(slug, csrfRef, filmId);
+        return ids?.lid ?? null;
+    }
+
+    // Rate a film through Letterboxd's form endpoint. `filmId` is the internal
+    // numeric id that search results already carry, so this costs one request
+    // instead of "fetch the film page to discover the LID, then PATCH".
+    // Returns true on success, false when LB rejected the action (it hands back
+    // a fresh csrf in that case), null when the response was not usable.
+    async function lbRateForm(filmId, ratingVal, csrfRef) {
+        const csrf = csrfRef?.val || getLBCsrf() || '';
+        const r = await fetchT(`https://letterboxd.com/s/film:${filmId}/rate/`, 10000, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Accept': 'text/json, application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-Token': csrf,
+                'Referer': location.href,
+            },
+            body: `rating=${ratingVal}&__csrf=${encodeURIComponent(csrf)}`,
+        });
+        if (!r?.status) return null;
+        const text = await r.text().catch(() => '');
+        if (text.trimStart().startsWith('{')) {
+            try {
+                const j = JSON.parse(text);
+                if (j?.csrf && csrfRef) csrfRef.val = j.csrf;
+                if (typeof j?.result === 'boolean') return j.result;
+            } catch { /* fall through */ }
+        }
+        return r.ok ? null : false;
     }
 
     let _lbApplyOkCount = 0;  // counter for successful LB apply operations
@@ -3940,11 +4296,30 @@
             console.warn('[mrs] CSRF token is empty! supermodelCSRF=', typeof supermodelCSRF !== 'undefined' ? supermodelCSRF : 'undefined');
         }
 
+        // Fast path: a known filmId skips the LID lookup entirely, which for a
+        // full import used to mean one extra film page per rated movie.
+        if (hasR && filmId) {
+            const ratingVal = Math.min(5, Math.max(0.5, Math.round(+rating10) / 2));
+            for (let attempt = 0; attempt < 2; attempt++) {
+                const ok = await lbRateForm(filmId, ratingVal, csrfRef);
+                if (ok === true) {
+                    _lbApplyOkCount++;
+                    DEBUG && console.log(`[mrs] LB RATED OK #${_lbApplyOkCount}: ${slug} filmId=${filmId} rating=${ratingVal} (csv=${rating10})`);
+                    return { status: 'rated' };
+                }
+                // Rejected form (usually an expired csrf, which the response
+                // just refreshed) or a transport hiccup: retry with the fresh
+                // token before paying for the slow LID path.
+                if (attempt === 1) break;
+                await sleep(150);
+            }
+        }
+
         for (let attempt = 0; attempt < 3; attempt++) {
             let r;
             if (hasR) {
                 // Rating: PATCH /me/rate/{LID}  body: {"rating": 0.5–5.0}
-                if (!lid) lid = await lbGetFilmLid(slug, csrfRef);
+                if (!lid) lid = await lbGetFilmLid(slug, csrfRef, filmId);
                 if (!lid) return { status: null };
                 const ratingVal = Math.min(5, Math.max(0.5, Math.round(+rating10) / 2));
                 const hdrs = {
@@ -3973,14 +4348,32 @@
             }
 
             if (r) {
-                const respText = await r.clone().text().catch(() => '');
-                if (r.ok) {
+                // fetchT returns a plain object with string-backed text(), so it
+                // is safely re-readable; .clone() never existed and the old
+                // `r.clone().text().catch()` always produced ''.
+                const respText = await r.text().catch(() => '');
+                let jsonResult = null;
+                if (respText.trimStart().startsWith('{')) {
+                    try {
+                        const j = JSON.parse(respText);
+                        if (j?.csrf) csrfRef.val = j.csrf;
+                        if (typeof j?.result === 'boolean') jsonResult = j.result;
+                    } catch { /* not JSON after all */ }
+                }
+                // The form endpoints answer HTTP 200 even when the action was
+                // rejected ("The form on this page had expired..."). Trusting
+                // r.ok alone counted unrated films as rated and lost ratings.
+                if (r.ok && jsonResult !== false) {
                     const status = hasR ? 'rated' : 'watched';
                     _lbApplyOkCount++;
                     if (_lbApplyOkCount <= 5 || _lbApplyOkCount % 50 === 0) {
                         DEBUG && console.log(`[mrs] LB ${status.toUpperCase()} OK #${_lbApplyOkCount}: ${slug} filmId=${filmId} lid=${lid} rating=${hasR ? Math.min(5, Math.max(0.5, Math.round(+rating10) / 2)) : 'none'} (csv=${rating10}) status=${r.status} resp=${respText.slice(0, 200)}`);
                     }
                     return { status };
+                }
+                if (jsonResult === false) {
+                    // A fresh csrf was stored above; retry with it.
+                    if (attempt < 2) { await sleep(150 + attempt * 250); continue; }
                 }
                 if (r.status === 429) {
                     const waitMs = 3000 + attempt * 3000;
@@ -4019,14 +4412,39 @@
                 });
                 if (r?.status === 429) { await sleep(500 + attempt * 600); continue; }
                 if (r?.ok) {
-                    DEBUG && console.log(`[mrs] LB favorite OK: filmId=${filmId}`);
-                    return { status: 'favorited' };
+                    // Same trap as the rate endpoint: /like/ answers HTTP 200 with
+                    // {"result":false,...} when the form token expired, so trusting
+                    // r.ok counted rejected likes as successful ones.
+                    const text = await r.text().catch(() => '');
+                    let result = null;
+                    if (text.trimStart().startsWith('{')) {
+                        try {
+                            const j = JSON.parse(text);
+                            if (j?.csrf && csrfRef) csrfRef.val = j.csrf;
+                            if (typeof j?.result === 'boolean') result = j.result;
+                        } catch { /* not JSON */ }
+                    }
+                    if (result !== false) {
+                        DEBUG && console.log(`[mrs] LB favorite OK: filmId=${filmId}`);
+                        return { status: 'favorited' };
+                    }
+                    console.warn(`[mrs] LB favorite rejected: filmId=${filmId} (csrf refreshed, retrying)`);
+                    if (attempt < 2) {
+                        // The response carried a fresh token, so retry immediately
+                        // instead of falling through to the slower backoff below.
+                        await sleep(150 + attempt * 250);
+                        continue;
+                    }
+                    return { status: null };
                 }
                 console.warn(`[mrs] LB favorite failed: filmId=${filmId} status=${r?.status}`);
             } catch (e) {
                 console.warn(`[mrs] LB favorite exception: filmId=${filmId}`, e.message);
             }
-            await sleep(1000);
+            // Only back off after a real failure. The old sleep(1000) ran even
+            // on the retry path of a successful request, making every like cost
+            // a full extra second.
+            if (attempt < 2) await sleep(400 + attempt * 400);
         }
         return { status: null };
     }
@@ -4037,13 +4455,15 @@
             setStatus(statusEl, t('lbUsernameNotFound'));
             return new Map();
         }
+        const el = statusEl;
         const map = new Map();
         // Title index so the importer can recognise an already-rated film
         // before spending a search request on it.
         const byTitle = new Map();
+        let seen = 0;
         const indexItem = (item, rating) => {
             if (!item.slug) return;
-            if (!map.has(item.slug)) map.set(item.slug, rating);
+            if (!map.has(item.slug)) { map.set(item.slug, rating); seen++; }
             // Index every known spelling so a title that differs from the page
             // title still hits the fast path instead of falling through to search.
             for (const name of [item.title, item.titleRu, item.titleOrig, ...(item.allTitles || [])]) {
@@ -4051,12 +4471,25 @@
                 if (k && !byTitle.has(k)) byTitle.set(k, item.slug);
             }
         };
-        const rated = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, 200,
-            (done, total) => setStatus(statusEl, `${t('page')} ${done}/${total}`, { current: done, total }, t('ratings')));
+        const write = (channel, label) => {
+            const ch = channelWriter(el, channel, label);
+            return (done, total) => ch(`${t('page')} ${done}/${total}`,
+                { current: done, total, extra: `${seen} ${t('movies')}` });
+        };
+        // Both listings are independent and each owns its own row, so fetch them
+        // together: sequentially they doubled the cost of every re-import before
+        // a single film was even looked up.
+        const [rated, watched] = await Promise.all([
+            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/ratings/` : `https://letterboxd.com/${u}/films/ratings/page/${p}/`, parseLBRatings, 200,
+                write('lbExistingRated', t('ratings'))),
+            lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, 200,
+                write('lbExistingWatched', t('lblExisting'))),
+        ]);
+        // Rated first so a rated film is never downgraded to plain "watched".
         for (const item of rated) indexItem(item, item.rating ?? 'watched');
-        const watched = await lbScrapePages(username, (u, p) => p === 1 ? `https://letterboxd.com/${u}/films/` : `https://letterboxd.com/${u}/films/page/${p}/`, parseLBWatched, 200,
-            (done, total) => setStatus(statusEl, `${t('page')} ${done}/${total}`, { current: done, total }, t('watchHistory')));
+        finishChannel(el, 'lbExistingRated', rated.length > 0, true);
         for (const item of watched) indexItem(item, 'watched');
+        finishChannel(el, 'lbExistingWatched', watched.length > 0, true);
         map.byTitle = byTitle;
         return map;
     }
@@ -4071,17 +4504,19 @@
 
         // Phase 1: resolve slugs
         Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
+        beginRun(statusEl, `${items.length} ${t('movies')}`);
         // Load the existing profile FIRST: 773 of 899 films in a re-import are
         // already rated, and resolving them by search was the bulk of the time.
-        setStatus(statusEl, mode === 'normal' && !deep ? t('checkingExisting') : t('startingImport') + dots());
         const existing = mode === 'normal' && !deep ? await lbFetchRatings(statusEl) : new Map();
-        setStatus(statusEl, t('resolveIdCount', { count: items.length }) + dots());
         const resolved = [];
         let cur = 0;
+        const chResolve = channelWriter(statusEl, 'lbResolve', t('lblSearch'));
+        let foundCount = 0;
 
         while (cur < items.length) {
             const slice = items.slice(cur, cur + lbProbe.c);
-            setStatus(statusEl, t('resolveProgress', { from: cur + 1, to: Math.min(cur + lbProbe.c, items.length), total: items.length }) + dots(), { current: Math.min(cur + lbProbe.c, items.length), total: items.length });
+            const to = Math.min(cur + lbProbe.c, items.length);
+            chResolve(`${cur + 1}–${to}/${items.length}`, { current: to, total: items.length, extra: `✓ ${foundCount}` });
             const t0 = Date.now();
             const res = await asyncPool(lbProbe.c, slice, i => {
                 // Fast path: already on the profile → no search needed at all.
@@ -4093,18 +4528,18 @@
                         if (knownSlug != null) break;
                     }
                     if (knownSlug != null && existing.has(knownSlug)) {
-                        const ex = existing.get(knownSlug);
-                        const hasR = i.rating != null && String(i.rating) !== '' && +i.rating >= 1 && +i.rating <= 10;
-                        if (ex !== 'watched' || !hasR) {
-                            return Promise.resolve({ slug: knownSlug, filmId: null, lid: null, score: 1.0, confidence: 'high', filmIdKey: i.filmIdKey ?? null, ttIdKey: i.ttIdKey ?? null });
-                        }
+                        // Return the known slug even when it will be skipped in
+                        // the apply phase: falling through to a search here was
+                        // paying for a lookup of ~86% of a re-import, only for
+                        // `toApply` to drop the item as already rated.
+                        return Promise.resolve({ slug: knownSlug, filmId: null, lid: null, score: 1.0, confidence: 'high', filmIdKey: i.filmIdKey ?? null, ttIdKey: i.ttIdKey ?? null });
                     }
                 }
                 // Direct slug match (valid URL slug or film: ID)
                 if (i.lbSlug && !deep) {
                     // Handle film:ID format (resolved later) and tv:slug format (used directly)
-            const filmIdMatch = i.lbSlug.match(/^film:(\d+)$/);
-            const tvSlugMatch = i.lbSlug.match(/^tv:(.+)$/);
+                    const filmIdMatch = i.lbSlug.match(/^film:(\d+)$/);
+                    const tvSlugMatch = i.lbSlug.match(/^tv:(.+)$/);
                     if (filmIdMatch) {
                         // Internal LB film ID - use filmId directly, fetch slug later
                         const filmId = filmIdMatch[1];
@@ -4120,70 +4555,81 @@
                 }
                 return lbSearchFilm(i.title, i.year, csrfRef, deep, i.allTitles, i);
             });
-            let fail = false;
+            let miss = 0;
             res.forEach((r, j) => {
                 const found = r.status === 'fulfilled' ? r.value : null;
-                if (!found || found.confidence === 'low' || (!deep && found.confidence === 'low')) {
+                if (!found || found.confidence === 'low') {
                     resolved.push({ item: slice[j], slug: null, filmId: null, lid: null });
-                    fail = true;
+                    miss++;
                 } else {
+                    foundCount++;
                     resolved.push({ item: slice[j], slug: found.slug, filmId: found.filmId, lid: found.lid });
                 }
             });
             cur += lbProbe.c;
             const elapsed = Date.now() - t0;
-            fail ? probeFail(lbProbe) : probeOk(lbProbe, elapsed);
+            // An unresolved title is a normal outcome, not a network failure.
+            // Treating every miss as one collapsed concurrency to MIN for the
+            // rest of the run, which is what made big imports take minutes.
+            miss / slice.length >= 0.5 ? probeFail(lbProbe) : probeOk(lbProbe, elapsed);
             // No artificial sleep between resolve batches
         }
+        finishChannel(statusEl, 'lbResolve', foundCount > 0, true);
 
-        // Resolve film: IDs to slugs before applying
-        const needSlug = resolved.filter(x => !x.slug && x.filmId);
-        if (needSlug.length) {
-            setStatus(statusEl, `Resolving film slugs for ${needSlug.length} films...` + dots());
-            const slugs = await asyncPool(5, needSlug, async x => {
-                try {
-                    // Fetch film page by ID to get the slug
-                    const r = await fetchT(`https://letterboxd.com/film/${x.filmId}/`, 12000);
-                    if (!r?.ok) return null;
-                    const html = await r.text();
-                    // Method 1: canonical link tag (flexible quote matching)
-                    let slugMatch = html.match(/<link\s+rel=["']?canonical["']?\s+href=["']https?:\/\/letterboxd\.com\/(?:film|tv)\/([^\/"'?#]+)/i);
-                    if (slugMatch) return slugMatch[1];
-                    // Method 2: og:url meta tag
-                    slugMatch = html.match(/<meta\s+property=["']og:url["']\s+content=["']https?:\/\/letterboxd\.com\/(?:film|tv)\/([^\/"'?#]+)/i);
-                    if (slugMatch) return slugMatch[1];
-                    // Method 3: extract slug from <title> or heading
-                    slugMatch = html.match(/data-film-slug=["']([^"']+)["']/);
-                    if (slugMatch) return slugMatch[1];
-                } catch (e) { /* ignore */ }
-                return null;
-            });
-            slugs.forEach((r, i) => {
-                if (r.status === 'fulfilled' && r.value) needSlug[i].slug = r.value;
-            });
-        }
+        // No slug-resolution phase: an item known by its internal film id can be
+        // written directly through /s/film:{id}/rate/ and /watch/, so fetching
+        // the film page just to learn its slug was one wasted request per row.
 
-        // Pre-fetch missing LIDs in parallel before apply phase
-        const needLid = resolved.filter(x => x.slug && !x.lid);
+        // Pre-fetch missing ids in parallel before the apply phase. Search
+        // results already carry filmId + lid; only CSV rows that arrived with a
+        // bare slug need the page lookup, and one fetch now yields both ids.
+        // A watched-only row always needs filmId (rating can go through the LID),
+        // and so does a favorite: likes are only writable through the form
+        // endpoint, which takes the numeric id.
+        const needLid = resolved.filter(x => {
+            if (!x.slug || x.filmId) return false;
+            if (!x.lid) return true;
+            const hasR = x.item.rating != null && String(x.item.rating) !== '' && +x.item.rating >= 1 && +x.item.rating <= 10;
+            return !hasR || !!x.item.favorite;
+        });
         if (needLid.length) {
-            setStatus(statusEl, t('fetchingLid', { count: needLid.length }) + dots());
-            const lids = await asyncPool(10, needLid, x => lbGetFilmLid(x.slug, csrfRef));
-            lids.forEach((r, i) => {
-                if (r.status === 'fulfilled' && r.value) needLid[i].lid = r.value;
+            const chLids = channelWriter(statusEl, 'lbLids', t('lblDetails'));
+            let lidDone = 0;
+            const lidReport = () => chLids(`${lidDone}/${needLid.length}`, { current: lidDone, total: needLid.length });
+            lidReport();
+            const ids = await asyncPool(10, needLid, async x => {
+                try { return await lbGetFilmIds(x.slug, csrfRef); }
+                finally {
+                    lidDone++;
+                    if (lidDone % 5 === 0 || lidDone === needLid.length) lidReport();
+                }
             });
+            ids.forEach((r, i) => {
+                if (r.status === 'fulfilled' && r.value) {
+                    needLid[i].lid = r.value.lid;
+                    needLid[i].filmId = r.value.filmId;
+                }
+            });
+            chLids(`${needLid.length}/${needLid.length}`, { current: needLid.length, total: needLid.length });
+            finishChannel(statusEl, 'lbLids', needLid.some(x => x.lid || x.filmId), true);
         }
 
         // Phase 2: apply
         Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
         // `existing` was loaded before phase 1 so that search could be skipped.
-        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0, favCount = 0;
+        let rated = 0, watched = 0, skipped = 0, notFound = 0, failed = 0;
         const missed = [];
         const toApply = resolved.filter(x => {
-            if (!x.slug) {
+            // An item is only truly unresolved when it has neither a slug nor an
+            // internal film id. A failed slug lookup must not discard a rating
+            // that can be written through /s/film:{id}/rate/.
+            if (!x.slug && !x.filmId) {
                 notFound++; missed.push({ ...x.item, error: t('errorNotFoundLB') }); return false;
             }
             const hasR = x.item.rating != null && String(x.item.rating) !== '' && +x.item.rating >= 1 && +x.item.rating <= 10;
-            const ex = existing.get(x.slug);
+            // A row known only by its internal id still matches the profile index
+            // when that index was built from a listing without slugs.
+            const ex = existing.get(x.slug) ?? (x.filmId ? existing.get('film:' + x.filmId) : undefined);
             if (mode === 'normal' && ex != null && (ex !== 'watched' || !hasR)) { skipped++; return false; }
             return true;
         });
@@ -4191,28 +4637,44 @@
 
         cur = 0;
         let favorites = 0;
+        const chApply = channelWriter(statusEl, 'lbApply', t('lblApply'));
         while (cur < toApply.length) {
             const slice = toApply.slice(cur, cur + lbProbe.c);
-            setStatus(statusEl, t('applyProgress', { from: cur + 1, to: Math.min(cur + lbProbe.c, toApply.length), total: toApply.length }) + dots(), { current: Math.min(cur + lbProbe.c, toApply.length), total: toApply.length });
+            const to = Math.min(cur + lbProbe.c, toApply.length);
+            chApply(`${cur + 1}–${to}/${toApply.length}`, { current: to, total: toApply.length, extra: `${rated} ${t('rated')}` });
+            const t0 = Date.now();
             const res = await asyncPool(lbProbe.c, slice, entry => applyLBRating(entry.slug, entry.lid, entry.filmId, entry.item.rating, csrfRef, entry.item.watchedDate));
+            let fail = 0;
             res.forEach((r, j) => {
                 const st = r.status === 'fulfilled' ? (r.value?.status ?? null) : null;
                 if (st === 'rated') rated++;
                 else if (st === 'watched') watched++;
-                else { failed++; missed.push({ ...toApply[cur + j].item, error: t('errorApi') }); }
+                else { failed++; fail++; missed.push({ ...toApply[cur + j].item, error: t('errorApi') }); }
             });
             cur += lbProbe.c;
-            await sleep(30);
+            // A rejected write is a normal outcome (bad match, taken down film);
+            // only a mostly-failing batch means the endpoint is pushing back.
+            fail / slice.length >= 0.5 ? probeFail(lbProbe) : probeOk(lbProbe, Date.now() - t0);
         }
+        if (toApply.length) chApply(`${toApply.length}/${toApply.length}`, { current: toApply.length, total: toApply.length, extra: `${rated} ${t('rated')}` });
+        finishChannel(statusEl, 'lbApply', failed === 0, true);
 
         const favItems = opts.importFavorites !== false ? toApply.filter(x => x.item.favorite && x.filmId) : [];
         if (favItems.length) {
-            setStatus(statusEl, 'Applying favorites...' + dots());
-            for (const entry of favItems) {
+            const chFav = channelWriter(statusEl, 'lbFavorites', t('lblFavorites'));
+            let favDone = 0;
+            const favReport = () => chFav(`${favDone}/${favItems.length}`, { current: favDone, total: favItems.length });
+            favReport();
+            // Parallel favorites: the old serial loop with sleep(200) added
+            // ~3.5 minutes for a thousand likes on top of the ratings.
+            await asyncPool(4, favItems, async entry => {
                 const r = await applyLBFavorite(entry.filmId, csrfRef);
                 if (r.status === 'favorited') favorites++;
-                await sleep(200);
-            }
+                favDone++;
+                if (favDone % 5 === 0 || favDone === favItems.length) favReport();
+            });
+            favReport();
+            finishChannel(statusEl, 'lbFavorites', true, true);
         }
 
         DEBUG && console.log(`[mrs] LB APPLY DONE: rated=${rated} watched=${watched} favorites=${favorites} failed=${failed} toApply=${toApply.length}`);
@@ -4239,7 +4701,7 @@
                 textContent: t('deepSearchBtn', { count: result.missed.length }),
             });
             btn.addEventListener('click', async () => {
-                setStatus(statusEl, t('deepSearch', { platform: 'Letterboxd' }) + dots());
+                beginRun(statusEl, t('deepSearch', { platform: 'Letterboxd' }));
                 await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions());
             });
             const btnWrap = document.createElement('div');
@@ -4309,8 +4771,8 @@
         .mrs-status__title{color:var(--mrs-fg-strong);font-weight:600;text-shadow:none;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
         .mrs-status__timer{margin-left:auto;color:var(--mrs-muted);font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:2px}
         .mrs-status__header--result{align-items:center;gap:8px;border-bottom:none}
-        .mrs-status__channels{display:flex;flex-direction:column;gap:4px;padding:0 22px 12px;color:var(--mrs-fg)}
-        .mrs-status__row{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:12px;line-height:1.5;color:var(--mrs-fg)}
+        .mrs-status__channels{display:flex;flex-direction:column;gap:4px;padding:8px 22px 12px;color:var(--mrs-fg)}
+        .mrs-status__row{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:12px;line-height:1.5;color:var(--mrs-fg);padding-top:1px}
         .mrs-status__row-label{flex:0 0 auto;color:var(--mrs-fg-strong);font-weight:600;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .mrs-status__row-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mrs-fg)}
         .mrs-status__row-main{color:var(--mrs-done)}

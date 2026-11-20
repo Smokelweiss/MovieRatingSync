@@ -59,7 +59,7 @@ class El {
 globalThis.document = { createElement: t => new El(t) };
 globalThis.CSS = { escape: s => String(s).replace(/["\\]/g, m => '\\' + m) };
 
-const names = ['ensureChannels', 'channelRow', 'setRowParts', 'setChannelStatus', 'finishChannel', 'channelWriter'];
+const names = ['ensureChannels', 'channelRow', 'setRowParts', 'updateOverallBar', 'setChannelStatus', 'finishChannel', 'channelWriter'];
 const decls = names.map(name => {
   const start = src.indexOf(`function ${name}(`);
   if (start < 0) throw new Error('missing function ' + name);

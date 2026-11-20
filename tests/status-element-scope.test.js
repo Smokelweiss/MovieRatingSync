@@ -126,7 +126,7 @@ function scopeFor(lineIndex) {
 }
 
 // ------------------------------------------------------------- the check
-const HELPERS = new Set(['setStatus', 'clearStatus', 'renderResult', 'channelWriter', 'finishChannel', 'ensureChannels']);
+const HELPERS = new Set(['setStatus', 'clearStatus', 'renderResult', 'channelWriter', 'finishChannel', 'ensureChannels', 'beginRun', 'ensureStatusShell', 'setTitle']);
 const problems = [];
 for (let n = 0; n < codeLines.length; n += 1) {
   const text = codeLines[n];
@@ -149,8 +149,9 @@ const check = (name, ok, extra = '') => {
 };
 
 check('every status helper receives a name that is in scope', problems.length === 0, problems.join(' | '));
-check('IMDb export passes its own status element', raw.includes("setStatus(statusEl, t('fetchingLid'"));
+check('IMDb export passes its own status element', /async function performIMDbExport\(statusEl\)\s*\{\s*const el = statusEl;/.test(raw));
 check('no bare `el` remains in the IMDb export', !raw.includes("setStatus(el, t('fetchingLid'"));
+check('KP export keeps its local alias', /async function performKPExport\(statusEl\)\s*\{\s*(?:const \w+ = Date\.now\(\);\s*)?const el = statusEl;/.test(raw));
 check(
   'LB export keeps its local alias',
   /async function performLBExport\(statusEl\)\s*\{\s*const el = statusEl;/.test(raw)
