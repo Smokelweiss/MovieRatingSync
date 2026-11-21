@@ -1581,18 +1581,18 @@
             let kpPagesDone = 1; // page 1 was fetched above
             const kpPageReport = () => writePages(kpPagesDone, totalPages);
             kpPageReport();
-            const pageResults = await asyncPool(10, pageNums, async (p) => {
+            const pageResults = await asyncPool(10, pageNums, async (pageNo) => {
                 try {
                 for (let attempt = 1; attempt <= 3; attempt++) {
-                    const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
+                    const { doc } = await fetchDocTimed(`${baseUrl}/?page=${pageNo}`);
                     if (!doc) break;
                     const items = parseKPListingPage(doc);
                     if (items.length > 0) {
-                        return { page: p, items };
+                        return { page: pageNo, items };
                     }
                     if (attempt < 3) { stats.retries++; await sleep(800 * attempt); }
                 }
-                return { page: p, items: [] };
+                return { page: pageNo, items: [] };
                 } finally {
                     kpPagesDone++;
                     if (kpPagesDone % 2 === 0 || kpPagesDone >= totalPages) kpPageReport();
@@ -2023,9 +2023,9 @@
             const pageNums = [];
             for (let p = 2; p <= totalPages; p++) pageNums.push(p);
             let pagesDone = 1;
-            const results = await asyncPool(10, pageNums, async (p) => {
+            const results = await asyncPool(10, pageNums, async (pageNo) => {
                 try {
-                    const { doc } = await fetchDocTimed(`${baseUrl}/?page=${p}`);
+                    const { doc } = await fetchDocTimed(`${baseUrl}/?page=${pageNo}`);
                     if (!doc) return [];
                     return parseKPListingPage(doc);
                 } finally {
@@ -3479,10 +3479,10 @@
         const scanned = new Set();
         const firstBatch = [];
         for (let p = 1; p <= Math.min(pageSize, 5); p++) firstBatch.push(p);
-        await asyncPool(5, firstBatch, async (p) => {
-            const html = await fetchLBHtml(pathFn(username, p));
-            scanned.add(p);
-            if (html) add(p, parseFn(html));
+        await asyncPool(5, firstBatch, async (pageNo) => {
+            const html = await fetchLBHtml(pathFn(username, pageNo));
+            scanned.add(pageNo);
+            if (html) add(pageNo, parseFn(html));
         });
         report(scanned.size, scanned.size);
 
