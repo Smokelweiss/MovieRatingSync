@@ -1551,7 +1551,7 @@
         // Two long phases, so two rows: listing pages, then film detail pages.
         const chPages = channelWriter(el, 'kpExportPages', t('lblPages'));
         const chDetails = channelWriter(el, 'kpDetails', t('lblDetails'));
-        const writePages = (done, total) => chPages(`${t('page')} ${done}/${total}`, { current: done, total });
+        const writePages = (done, total) => chPages(`${t('page')} ${done}/${total}`, { current: done, total, extra: '' });
 
         // Fetch page 1 first to discover totalPages
         chPages(`${t('page')} 1`, { current: 0, total: 0 });
@@ -3493,14 +3493,14 @@
             for (let p = next; p < next + 10 && p <= pageSize; p++) pages.push(p);
             let fetched = 0;
             let items = 0;
-            await asyncPool(5, pages, async (p) => {
-                const html = await fetchLBHtml(pathFn(username, p));
-                scanned.add(p);
+            await asyncPool(5, pages, async (pageNo) => {
+                const html = await fetchLBHtml(pathFn(username, pageNo));
+                scanned.add(pageNo);
                 if (!html) return;
                 const parsed = parseFn(html);
                 fetched++;
                 items += parsed ? parsed.length : 0;
-                add(p, parsed);
+                add(pageNo, parsed);
             });
             next += pages.length;
             report(scanned.size, next - 1);
@@ -3953,7 +3953,7 @@
         const chWatched = channelWriter(el, 'lbWatched', t('watched'));
         const chLikes = channelWriter(el, 'lbLikes', t('likes'));
         const scrape = (write, pathFn, parseFn) => lbScrapePages(username, pathFn, parseFn, 200,
-            (done, total) => write(`${t('page')} ${done}/${total}`, { current: done, total }));
+            (done, total) => write(`${t('page')} ${done}/${total}`, { current: done, total, extra: '' }));
         const settle = (channel, p) => p.then(
             (value) => { finishChannel(el, channel, true, true); return value; },
             (err) => { finishChannel(el, channel, false); throw err; }
