@@ -4811,6 +4811,7 @@
                     // 3 s + 6 s ladder stalled an entire import behind one film.
                     const waitMs = 900 + attempt * 900 + Math.floor(Math.random() * 300);
                     DEBUG && console.warn(`[mrs] LB 429: ${slug} — retry in ${waitMs}ms (attempt ${attempt + 1}/3)`);
+                    if (attempt >= 2) return { status: null, transport: true };
                     await sleep(waitMs);
                     continue;
                 }
@@ -4820,12 +4821,19 @@
                     continue;
                 }
                 console.warn(`[mrs] LB FAILED: ${slug} filmId=${filmId} lid=${lid} rating=${hasR ? rating10 : 'none'} status=${r.status} body=${respText.slice(0, 300)}`);
+                // 5xx after every retry and a bare 0/403/408 are throttles or
+                // transport problems, not a rejected match: let the caller
+                // schedule a quieter pass instead of calling it a failed import.
+                if (!r.status || r.status === 403 || r.status === 408 || r.status >= 500) {
+                    return { status: null, transport: true };
+                }
                 return { status: null };
             } else {
                 console.warn(`[mrs] LB timeout: ${slug} filmId=${filmId}`);
+                return { status: null, transport: true };
             }
         }
-        return { status: null };
+        return { status: null, transport: true };
     }
 
     async function applyLBFavorite(filmId, csrfRef) {
@@ -5098,23 +5106,44 @@
         cur = 0;
         let favorites = 0;
         const chApply = channelWriter(statusEl, 'lbApply', t('lblApply'));
+        let lbRetry = [];
+        const applyLBSlice = async (slice, isRetry) => {
+            const res = await asyncPool(lbProbe.c, slice, entry => applyLBRating(entry.slug, entry.lid, entry.filmId, entry.item.rating, csrfRef, entry.item.watchedDate));
+            let fail = 0, transport = 0;
+            res.forEach((r, j) => {
+                const st = r.status === 'fulfilled' ? (r.value?.status ?? null) : null;
+                if (st === 'rated') rated++;
+                else if (st === 'watched') watched++;
+                // A 429/5xx means the form post was throttled, not that the match
+               // was wrong; retry it once in a quieter pass instead of reporting
+                // it as a failed import.
+                else if (r.value?.transport && !isRetry) { transport++; lbRetry.push(slice[j]); }
+                else { failed++; fail++; missed.push({ ...slice[j].item, error: t('errorApi') }); }
+            });
+            return fail + transport;
+        };
         while (cur < toApply.length) {
             const slice = toApply.slice(cur, cur + lbProbe.c);
             const to = Math.min(cur + lbProbe.c, toApply.length);
             chApply(`${cur + 1}–${to}/${toApply.length}`, { current: to, total: toApply.length, extra: `${rated} ${t('rated')}` });
             const t0 = Date.now();
-            const res = await asyncPool(lbProbe.c, slice, entry => applyLBRating(entry.slug, entry.lid, entry.filmId, entry.item.rating, csrfRef, entry.item.watchedDate));
-            let fail = 0;
-            res.forEach((r, j) => {
-                const st = r.status === 'fulfilled' ? (r.value?.status ?? null) : null;
-                if (st === 'rated') rated++;
-                else if (st === 'watched') watched++;
-                else { failed++; fail++; missed.push({ ...toApply[cur + j].item, error: t('errorApi') }); }
-            });
+            const fail = await applyLBSlice(slice, false);
             cur = to;
             // A rejected write is a normal outcome (bad match, taken down film);
             // only a mostly-failing batch means the endpoint is pushing back.
             fail / slice.length >= 0.5 ? probeFail(lbProbe) : probeOk(lbProbe, Date.now() - t0);
+        }
+        if (lbRetry.length) {
+            const pendingRetry = lbRetry;
+            lbRetry = [];
+            chApply(`${t('lblApply')} ↻ ${pendingRetry.length}`, { extra: `↻ ${pendingRetry.length}` });
+            await sleep(2500 + Math.random() * 1000);
+            Object.assign(lbProbe, makeProbe(4, 8));
+            await applyLBSlice(pendingRetry, true);
+            for (const entry of lbRetry) {
+                failed++;
+                missed.push({ ...entry.item, error: t('errorApi') });
+            }
         }
         if (toApply.length) chApply(`${toApply.length}/${toApply.length}`, { current: toApply.length, total: toApply.length, extra: `${rated} ${t('rated')}` });
         finishChannel(statusEl, 'lbApply', failed === 0, true);
