@@ -31,6 +31,8 @@ const code = [
   slice(/const PLATFORM_SHORT = \{[^}]*\};/),
   slice(/const PLATFORM_NAME = \{[^}]*\};/),
   slice(/const PLATFORM_DIRECTION = (?:[^;]|\n)*?;\n/),
+  slice(/const COLUMN_SOURCE = \{[^}]*\};/),
+  helper('splitCsvLine'),
   helper('detectCsvSource'),
   helper('missedFileName'),
 ].join('\n');
@@ -43,19 +45,37 @@ const check = (label, cond, extra) => {
   if (!cond) ok = false;
 };
 
-const hdr = (...c) => '\uFEFF' + c.join(',') + '\r\n';
 const date = new Date().toISOString().slice(0, 10);
+const EXT_HEADER = 'TitleRu,TitleOrig,AllTitles,Type,KpId,TtId,LbSlug,YearStart,YearEnd,Rating10,Genres,Src';
 
-// 1. Source detection from the export columns.
-check('KpId header means the file came from Kinopoisk',
-  impl.detectCsvSource(hdr('TitleRu', 'KpId', 'Rating10')) === 'kp');
-check('TtId header means the file came from IMDb',
-  impl.detectCsvSource(hdr('TitleRu', 'TitleOrig', 'TtId', 'Rating10')) === 'imdb');
-check('LbSlug header means the file came from Letterboxd',
-  impl.detectCsvSource(hdr('Title', 'Year', 'LbSlug', 'Rating10')) === 'lb');
+// A real export of ours: same extended header every time, only one id column
+// is filled. This is what used to be misread as Kinopoisk.
+const ourFile = (row) => `${EXT_HEADER}\r\n${row}\r\n`;
+
+// 1. Our own exports: the filled id column wins over the shared header.
+check('Letterboxd export (only LbSlug filled) is read as Letterboxd',
+  impl.detectCsvSource(ourFile('"","Носферату","Nosferatu | Носферату",Film,,,nosferatu,1922,,8,Horror,lb')) === 'lb');
+check('IMDb export (only TtId filled) is read as IMDb',
+  impl.detectCsvSource(ourFile('"","The Matrix","The Matrix",Film,,tt0133093,1999,,9,,,imdb')) === 'imdb');
+check('Kinopoisk export (only KpId filled) is read as Kinopoisk',
+  impl.detectCsvSource(ourFile('"Матрица","The Matrix","Матрица | The Matrix",Film,301,,,1999,,9,,,kp')) === 'kp');
+check('the source wins even with no Src column (older files)',
+  impl.detectCsvSource(EXT_HEADER.replace(',Src', '') + '\r\n"","X","X",Film,,,x-slug,1999,,7,,,\r\n') === 'lb');
+check('the shared extended header alone does not mean Kinopoisk',
+  impl.detectCsvSource(EXT_HEADER + '\r\n"","X","X",Film,,,,"1999",,7,,,\r\n') === null);
+
+// 2. Foreign files without an id still resolve from their header.
+check('Letterboxd web export (Title,Year,LbSlug) is read as Letterboxd',
+  impl.detectCsvSource('\uFEFFDate,Name,Year,Letterboxd URI,Rating\r\n2026-01-01,X,1999,https://boxd.it/1,4\r\n') === 'lb');
+check('IMDb ratings export (Const column) is read as IMDb',
+  impl.detectCsvSource('\uFEFFConst,Your Rating,Date Rated,Title,URL,Title Type,IMDb Rating,Runtime,Year,Genres\r\ntt0133093,9,2026-01-01,The Matrix,https://www.imdb.com/title/tt0133093/,movie,8.7,136,1999,Sci-Fi\r\n') === 'imdb');
 check('a foreign header (Title,Year,Rating10) is unknown, not guessed',
-  impl.detectCsvSource(hdr('Title', 'Year', 'Rating10')) === null);
+  impl.detectCsvSource('Title,Year,Rating10\r\nX,1999,7\r\n') === null);
 check('an empty file is unknown', impl.detectCsvSource('') === null);
+
+// 3. A file with two filled ids prefers the more specific column.
+check('LbSlug beats an IMDb id when both are present',
+  impl.detectCsvSource(ourFile('"","X","X",Film,tt0133093,tt0133093,nosferatu,1922,,8,,,') ) === 'lb');
 
 // 2. File names carry both ends, the count and the date.
 const f1 = impl.missedFileName('imdb', 'lb', 42);

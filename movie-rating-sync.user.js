@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.7
+// @version      1.8
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -676,16 +676,64 @@
     const PLATFORM_SHORT = { kp: 'kp', imdb: 'imdb', lb: 'lb' };
     const PLATFORM_NAME = { kp: 'Kinopoisk', imdb: 'IMDb', lb: 'Letterboxd' };
 
-    // Which platform a CSV came from, decided by the columns it carries:
-    // KpId → Kinopoisk, TtId → IMDb, LbSlug → Letterboxd. Exports always carry
-    // the source id; `src` on a row is a fallback.
+    // Column name → platform. Every one of our exports writes the SAME extended
+    // header (it lists KpId, TtId AND LbSlug), so a header alone never identifies
+    // the source — only the columns that actually carry values do.
+    const COLUMN_SOURCE = {
+        kpid: 'kp', 'kp id': 'kp', 'kinopoisk id': 'kp', kinopoiskid: 'kp',
+        ttid: 'imdb', 'imdb id': 'imdb', 'imdb idref': 'imdb', const: 'imdb',
+        lbslug: 'lb', 'letterboxd uri': 'lb', letterboxduri: 'lb', 'letterboxd url': 'lb',
+    };
+
+    // Which platform a CSV came from:
+    //   1. an explicit `Src` column (written by our own exports),
+    //   2. whichever id column actually holds data (KpId / TtId / LbSlug / …),
+    //   3. a header that names exactly one platform (a foreign file).
+    // Returns null when the file carries no platform information at all.
     function detectCsvSource(csvData) {
-        const header = String(csvData ?? '').split(/\r?\n/, 1)[0].replace(/^\uFEFF/, '');
-        const cols = header.split(',').map(c => c.trim().toLowerCase());
-        if (cols.includes('kpid')) return 'kp';
-        if (cols.includes('ttid')) return 'imdb';
-        if (cols.includes('lbslug')) return 'lb';
-        return null;
+        const text = String(csvData ?? '').replace(/^\uFEFF/, '');
+        const lines = text.split(/\r?\n/);
+        const header = splitCsvLine(lines[0] || '').map(h => h.trim().toLowerCase());
+        if (!header.length) return null;
+
+        // 1) Explicit marker from our own exports.
+        const srcCol = header.indexOf('src');
+        if (srcCol >= 0) {
+            for (let i = 1; i < lines.length && i <= 20; i++) {
+                if (!lines[i].trim()) continue;
+                const v = (splitCsvLine(lines[i])[srcCol] || '').trim().toLowerCase();
+                if (PLATFORM_SHORT[v]) return v;
+            }
+        }
+
+        // 2) Data beats the header: sample rows and see which id column is filled.
+        const counts = { kp: 0, imdb: 0, lb: 0 };
+        const cols = new Map(); // platform → column indexes that can prove it
+        header.forEach((h, idx) => {
+            const p = COLUMN_SOURCE[h];
+            if (!p) return;
+            if (!cols.has(p)) cols.set(p, []);
+            cols.get(p).push(idx);
+        });
+        let sampled = 0;
+        for (let i = 1; i < lines.length && sampled < 20; i++) {
+            const line = lines[i];
+            if (!line.trim()) continue;
+            sampled++;
+            const cells = splitCsvLine(line);
+            for (const [p, idxs] of cols) {
+                if (idxs.some(idx => String(cells[idx] ?? '').trim())) counts[p]++;
+            }
+        }
+        let best = null, bestN = 0;
+        // Ties are impossible in practice; prefer the more specific id column.
+        for (const p of ['lb', 'imdb', 'kp']) {
+            if (counts[p] > bestN) { best = p; bestN = counts[p]; }
+        }
+        if (best && bestN > 0) return best;
+
+        // 3) No data to judge by: accept a header that names exactly one platform.
+        return cols.size === 1 ? [...cols.keys()][0] : null;
     }
 
     // "Kinopoisk → IMDb": the two ends of the run, shown in the result title.
@@ -734,7 +782,7 @@
             const hasDates = rows.some(r => r.watchedDate);
             const hasFav = rows.some(r => r.favorite);
             const hasMeta = rows.some(r => r.runtime || r.directors || r.actors || r.premiereDate || r.genres);
-            let baseHdr = 'TitleRu,TitleOrig,AllTitles,Type,KpId,TtId,LbSlug,YearStart,YearEnd,Rating10,Genres';
+            let baseHdr = 'TitleRu,TitleOrig,AllTitles,Type,KpId,TtId,LbSlug,YearStart,YearEnd,Rating10,Genres,Src';
             if (hasMeta) baseHdr += ',Runtime,Directors,Actors,PremiereDate';
             let hdr = hasDates && hasFav
                 ? baseHdr + ',Favorite,WatchedDate'
@@ -762,6 +810,7 @@
                     r.yearEnd ?? '',
                     ratingVal,
                     csvEsc(r.genres ?? ''),
+                    (r.src ?? ''),
                 ].join(',');
                 if (hasMeta) line += `,${csvEsc(r.runtime ?? '')},${csvEsc(r.directors ?? '')},${csvEsc(r.actors ?? '')},${csvEsc(r.premiereDate ?? '')}`;
                 if (hasDates && hasFav) line += `,${favVal},${r.watchedDate ?? ''}`;
