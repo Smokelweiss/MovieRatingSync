@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.8
+// @version      1.9
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -61,7 +61,7 @@
 
     // ====================== I18N ======================
 
-    const TRANSLATIONS = { en: { time: 'Time', exportRatings: '📤 Export Ratings', importRatings: '📥 Import', hardImport: '🔄 Hard Import', loadingPage: 'Loading page {p}{total} ({count} movies)', kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed', kpListingFailed: 'Failed to load Kinopoisk listing', profileDetect: 'Detecting {platform} profile', loadedRecords: 'Loaded {count} records. {next}', checkingExisting: 'Checking existing ratings...', startingImport: 'Starting import...', importProgress: 'Import to {platform} {from}–{to}/{total}', searchProgress: 'Search {from}–{to}/{total}', resolveProgress: 'Resolving {from}–{to}/{total}', resolveIdCount: 'Resolving IDs: {count} movies', fetchingLid: 'Fetching LID: {count} movies', applyProgress: 'Applying {from}–{to}/{total}', loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)', deepSearch: 'Deep search {platform}', scanHistory: 'Scanning {platform} history', foundCount: 'Found: {count} movies. Generating CSV', userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped', ratings: 'Ratings', watchHistory: 'Watch history', diary: 'Diary', watched: 'Watched', page: 'page', kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page', imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account', lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile', csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account', csvEmpty: '❌ CSV is empty or not recognized', done: '✅ Done{mode}!', replaceMode: ' (replace mode)', rated: 'Rated: ', watchedShort: 'Watched: ', skipped: 'Skipped: ', notFound: 'Not found: ', failed: 'Errors: ', errorNotFoundKP: 'Not found on Kinopoisk', errorNotFoundIMDb: 'Not found on IMDb', errorNotFoundLB: 'Not found on Letterboxd', errorApi: 'API error / network failure', allImported: '🎉 All records imported!', exportDone: '✅ Export complete! File saved.', deepSearchBtn: '🔍 Deep search ({count})', movies: 'movies', favorites: 'Favorites: ', likes: 'Likes', importFavorites: 'Import favorites', language: 'Language', exportHint: 'Download all your ratings from this platform as a CSV file', importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added', hardImportHint: 'Import from CSV and overwrite existing ratings (normal mode skips already-rated films)', importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list', runtime: 'Runtime', directors: 'Directors', actors: 'Actors', premiereDate: 'Premiere date', languageHint: 'Select the interface language', imdbNoData: 'No ratings or watch history found — make sure you are logged in and have rated films on IMDb', lblDetails: 'Details', lblSearch: 'Search', lblApply: 'Apply', lblFavorites: 'Favorites', lblExisting: 'Existing', lblHistory: 'History', lblImport: 'Import', lblPages: 'Pages', }, ru: { time: 'Время', exportRatings: '📤 Экспорт оценок', importRatings: '📥 Импорт', hardImport: '🔄 Полная замена', loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)', kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали', kpListingFailed: 'Не удалось загрузить листинг КП', profileDetect: 'Определяем профиль {platform}', loadedRecords: 'Загружено {count} записей. {next}', checkingExisting: 'Проверяем существующие оценки...', startingImport: 'Начинаем импорт...', importProgress: 'Импорт на {platform} {from}–{to}/{total}', searchProgress: 'Поиск {from}–{to}/{total}', resolveProgress: 'Резолвинг {from}–{to}/{total}', resolveIdCount: 'Резолвинг ID: {count} фильмов', fetchingLid: 'Получение LID: {count} фильмов', applyProgress: 'Применение {from}–{to}/{total}', loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)', deepSearch: 'Глубокий поиск {platform}', scanHistory: 'Сканируем историю {platform}', foundCount: 'Найдено: {count} фильмов. Формируем CSV', userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены', ratings: 'Оценки', watchHistory: 'Просмотры', diary: 'Дневник', watched: 'Просмотрено', page: 'стр.', kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП', imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт', lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль', csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd', csvEmpty: '❌ CSV пуст или не распознан', done: '✅ Готово{mode}!', replaceMode: ' (режим замены)', rated: 'Оценено: ', watchedShort: 'Просмотрено: ', skipped: 'Пропущено: ', notFound: 'Не найдено: ', failed: 'Ошибок: ', errorNotFoundKP: 'Не найдено на Кинопоиске', errorNotFoundIMDb: 'Не найдено на IMDb', errorNotFoundLB: 'Не найдено на Letterboxd', errorApi: 'Ошибка API / сетевой сбой', allImported: '🎉 Все записи импортированы!', exportDone: '✅ Экспорт завершён! Файл сохранён.', deepSearchBtn: '🔍 Искать глубже ({count})', movies: 'фильмов', favorites: 'Избранное: ', likes: 'Лайки', importFavorites: 'Импортировать избранное', language: 'Язык', exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл', importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются', hardImportHint: 'Импорт из CSV с перезаписью существующих оценок (обычный режим пропускает уже оценённые фильмы)', importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного', runtime: 'Длительность', directors: 'Режиссёры', actors: 'Актёры', premiereDate: 'Дата премьеры', languageHint: 'Выбор языка интерфейса', imdbNoData: 'Нет оценок или истории просмотров — убедитесь, что вы вошли в аккаунт и оценили фильмы на IMDb', lblDetails: 'Детали', lblSearch: 'Поиск', lblApply: 'Применение', lblFavorites: 'Избранное', lblExisting: 'Существующие', lblHistory: 'История', lblImport: 'Импорт', lblPages: 'Страницы', }, es: { time: 'Tiempo', exportRatings: '📤 Exportar valoraciones', importRatings: '📥 Importar', hardImport: '🔄 Importación forzada', loadingPage: 'Cargando pág. {p}{total} ({count} películas)', kpParseFailed: 'Error al analizar el listado de Kinopoisk', kpListingFailed: 'Error al cargar el listado de Kinopoisk', profileDetect: 'Detectando perfil de {platform}', loadedRecords: 'Cargados {count} registros. {next}', checkingExisting: 'Comprobando valoraciones existentes...', startingImport: 'Iniciando importación...', importProgress: 'Importando a {platform} {from}–{to}/{total}', searchProgress: 'Buscando {from}–{to}/{total}', resolveProgress: 'Resolviendo {from}–{to}/{total}', resolveIdCount: 'Resolviendo IDs: {count} películas', fetchingLid: 'Obteniendo LID: {count} películas', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)', deepSearch: 'Búsqueda profunda {platform}', scanHistory: 'Escaneando historial de {platform}', foundCount: 'Encontradas: {count} películas. Generando CSV', userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes', ratings: 'Valoraciones', watchHistory: 'Historial', diary: 'Diario', watched: 'Visto', page: 'página', kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk', imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión', lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil', csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd', csvEmpty: '❌ CSV vacío o no reconocido', done: '✅ ¡Listo{mode}!', replaceMode: ' (modo reemplazo)', rated: 'Valorado: ', watchedShort: 'Visto: ', skipped: 'Omitido: ', notFound: 'No encontrado: ', failed: 'Errores: ', errorNotFoundKP: 'No encontrado en Kinopoisk', errorNotFoundIMDb: 'No encontrado en IMDb', errorNotFoundLB: 'No encontrado en Letterboxd', errorApi: 'Error de API / fallo de red', allImported: '🎉 ¡Todos los registros importados!', exportDone: '✅ ¡Exportación completa! Archivo guardado.', deepSearchBtn: '🔍 Búsqueda profunda ({count})', movies: 'películas', favorites: 'Favoritos: ', likes: 'Me gusta', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV', importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden', hardImportHint: 'Importa desde CSV y sobrescribe las valoraciones existentes', importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista', runtime: 'Duración', directors: 'Directores', actors: 'Actores', premiereDate: 'Fecha de estreno', languageHint: 'Selecciona el idioma de la interfaz', imdbNoData: 'No se encontraron valoraciones ni historial — inicia sesión y valora películas en IMDb', lblDetails: 'Detalles', lblSearch: 'Búsqueda', lblApply: 'Aplicar', lblFavorites: 'Favoritos', lblExisting: 'Existentes', lblHistory: 'Historial', lblImport: 'Importar', lblPages: 'Páginas', }, fr: { time: 'Temps', exportRatings: '📤 Exporter les notes', importRatings: '📥 Importer', hardImport: '🔄 Importation forcée', loadingPage: 'Chargement p. {p}{total} ({count} films)', kpParseFailed: "Échec de l'analyse du listing Kinopoisk", kpListingFailed: 'Échec du chargement du listing Kinopoisk', profileDetect: 'Détection du profil {platform}', loadedRecords: '{count} enregistrements chargés. {next}', checkingExisting: 'Vérification des notes existantes...', startingImport: "Démarrage de l'importation...", importProgress: 'Importation vers {platform} {from}–{to}/{total}', searchProgress: 'Recherche {from}–{to}/{total}', resolveProgress: 'Résolution {from}–{to}/{total}', resolveIdCount: 'Résolution des IDs: {count} films', fetchingLid: 'Récupération LID: {count} films', applyProgress: 'Application {from}–{to}/{total}', loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)', deepSearch: 'Recherche approfondie {platform}', scanHistory: "Analyse de l'historique {platform}", foundCount: 'Trouvés: {count} films. Génération CSV', userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées', ratings: 'Notes', watchHistory: 'Historique', diary: 'Journal', watched: 'Vu', page: 'page', kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk', imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous', lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil', csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd', csvEmpty: '❌ CSV vide ou non reconnu', done: '✅ Terminé{mode}!', replaceMode: ' (mode remplacement)', rated: 'Noté: ', watchedShort: 'Vu: ', skipped: 'Ignoré: ', notFound: 'Introuvable: ', failed: 'Erreurs: ', errorNotFoundKP: 'Non trouvé sur Kinopoisk', errorNotFoundIMDb: 'Non trouvé sur IMDb', errorNotFoundLB: 'Non trouvé sur Letterboxd', errorApi: 'Erreur API / problème réseau', allImported: '🎉 Tous les enregistrements importés!', exportDone: '✅ Export terminé! Fichier sauvegardé.', deepSearchBtn: '🔍 Recherche approfondie ({count})', movies: 'films', favorites: 'Favoris: ', likes: 'J\'aime', importFavorites: 'Importer les favoris', language: 'Langue', exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV', importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées', hardImportHint: 'Importe depuis CSV et écrase les notes existantes', importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris', runtime: 'Durée', directors: 'Réalisateurs', actors: 'Acteurs', premiereDate: 'Date de sortie', languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera', imdbNoData: 'Aucune note ni historique trouvé — connectez-vous et notez des films sur IMDb', lblDetails: 'Détails', lblSearch: 'Recherche', lblApply: 'Appliquer', lblFavorites: 'Favoris', lblExisting: 'Existants', lblHistory: 'Historique', lblImport: 'Importer', lblPages: 'Pages', }, de: { time: 'Zeit', exportRatings: '📤 Bewertungen exportieren', importRatings: '📥 Importieren', hardImport: '🔄 Hartimport', loadingPage: 'Lade Seite {p}{total} ({count} Filme)', kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden', kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden', profileDetect: 'Erkenne {platform}-Profil', loadedRecords: '{count} Einträge geladen. {next}', checkingExisting: 'Prüfe bestehende Bewertungen...', startingImport: 'Starte Import...', importProgress: 'Importiere zu {platform} {from}–{to}/{total}', searchProgress: 'Suche {from}–{to}/{total}', resolveProgress: 'Auflösen {from}–{to}/{total}', resolveIdCount: 'Löse IDs auf: {count} Filme', fetchingLid: 'Hole LID: {count} Filme', applyProgress: 'Wende an {from}–{to}/{total}', loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)', deepSearch: 'Tiefensuche {platform}', scanHistory: 'Scanne {platform}-Verlauf', foundCount: 'Gefunden: {count} Filme. Erstelle CSV', userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen', ratings: 'Bewertungen', watchHistory: 'Verlauf', diary: 'Tagebuch', watched: 'Gesehen', page: 'Seite', kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil', imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden', lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil', csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden', csvEmpty: '❌ CSV leer oder nicht erkannt', done: '✅ Fertig{mode}!', replaceMode: ' (Ersetzungsmodus)', rated: 'Bewertet: ', watchedShort: 'Gesehen: ', skipped: 'Übersprungen: ', notFound: 'Nicht gefunden: ', failed: 'Fehler: ', errorNotFoundKP: 'Nicht gefunden auf Kinopoisk', errorNotFoundIMDb: 'Nicht gefunden auf IMDb', errorNotFoundLB: 'Nicht gefunden auf Letterboxd', errorApi: 'API-Fehler / Netzwerkfehler', allImported: '🎉 Alle Einträge importiert!', exportDone: '✅ Export abgeschlossen! Datei gespeichert.', deepSearchBtn: '🔍 Tiefensuche ({count})', movies: 'Filme', favorites: 'Favoriten: ', likes: 'Gefällt mir', importFavorites: 'Favoriten importieren', language: 'Sprache', exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter', importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt', hardImportHint: 'Importiert aus CSV und überschreibt bestehende Bewertungen', importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt', runtime: 'Laufzeit', directors: 'Regisseur', actors: 'Schauspieler', premiereDate: 'Premiere', languageHint: 'Wähle die Sprache der Oberfläche', imdbNoData: 'Keine Bewertungen oder Verlauf gefunden — melde dich an und bewerte Filme auf IMDb', lblDetails: 'Details', lblSearch: 'Suche', lblApply: 'Anwenden', lblFavorites: 'Favoriten', lblExisting: 'Vorhandene', lblHistory: 'Verlauf', lblImport: 'Import', lblPages: 'Seiten', }, pt: { time: 'Tempo', exportRatings: '📤 Exportar avaliações', importRatings: '📥 Importar', hardImport: '🔄 Importação forçada', loadingPage: 'Carregando pág. {p}{total} ({count} filmes)', kpParseFailed: 'Falha ao analisar listagem do Kinopoisk', kpListingFailed: 'Falha ao carregar listagem do Kinopoisk', profileDetect: 'Detectando perfil {platform}', loadedRecords: '{count} registros carregados. {next}', checkingExisting: 'Verificando avaliações existentes...', startingImport: 'Iniciando importação...', importProgress: 'Importando para {platform} {from}–{to}/{total}', searchProgress: 'Pesquisando {from}–{to}/{total}', resolveProgress: 'Resolvendo {from}–{to}/{total}', resolveIdCount: 'Resolvendo IDs: {count} filmes', fetchingLid: 'Obtendo LID: {count} filmes', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)', deepSearch: 'Pesquisa profunda {platform}', scanHistory: 'Escaneando histórico {platform}', foundCount: 'Encontrados: {count} filmes. Gerando CSV', userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas', ratings: 'Avaliações', watchHistory: 'Histórico', diary: 'Diário', watched: 'Assistido', page: 'página', kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk', imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login', lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil', csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd', csvEmpty: '❌ CSV vazio ou não reconhecido', done: '✅ Concluído{mode}!', replaceMode: ' (modo substituição)', rated: 'Avaliado: ', watchedShort: 'Assistido: ', skipped: 'Ignorado: ', notFound: 'Não encontrado: ', failed: 'Erros: ', errorNotFoundKP: 'Não encontrado no Kinopoisk', errorNotFoundIMDb: 'Não encontrado no IMDb', errorNotFoundLB: 'Não encontrado no Letterboxd', errorApi: 'Erro de API / falha de rede', allImported: '🎉 Todos os registros importados!', exportDone: '✅ Exportação concluída! Arquivo salvo.', deepSearchBtn: '🔍 Pesquisa profunda ({count})', movies: 'filmes', favorites: 'Favoritos: ', likes: 'Curtidas', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV', importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas', hardImportHint: 'Importa de CSV e sobrescreve as avaliações existentes', importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos', runtime: 'Duração', directors: 'Diretores', actors: 'Atores', premiereDate: 'Data de estreia', languageHint: 'Selecione o idioma da interface', imdbNoData: 'Nenhuma avaliação ou histórico encontrado — faça login e avalie filmes no IMDb', lblDetails: 'Detalhes', lblSearch: 'Busca', lblApply: 'Aplicar', lblFavorites: 'Favoritos', lblExisting: 'Existentes', lblHistory: 'Histórico', lblImport: 'Importar', lblPages: 'Páginas', }, zh: { time: '时间', exportRatings: '📤 导出评分', importRatings: '📥 导入', hardImport: '🔄 强制导入', loadingPage: '加载第 {p}{total} 页 ({count} 部电影)', kpParseFailed: '无法解析 Kinopoisk 列表', kpListingFailed: '无法加载 Kinopoisk 列表', profileDetect: '正在检测 {platform} 个人资料', loadedRecords: '已加载 {count} 条记录。{next}', checkingExisting: '正在检查现有评分...', startingImport: '开始导入...', importProgress: '正在导入到 {platform} {from}–{to}/{total}', searchProgress: '搜索中 {from}–{to}/{total}', resolveProgress: '解析中 {from}–{to}/{total}', resolveIdCount: '解析 ID: {count} 部电影', fetchingLid: '获取 LID: {count} 部电影', applyProgress: '应用中 {from}–{to}/{total}', loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)', deepSearch: '深度搜索 {platform}', scanHistory: '扫描 {platform} 历史记录', foundCount: '找到: {count} 部电影。正在生成 CSV', userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分', ratings: '评分', watchHistory: '观看历史', diary: '日记', watched: '已看', page: '页', kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面', imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户', lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料', csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd', csvEmpty: '❌ CSV 为空或无法识别', done: '✅ 完成{mode}!', replaceMode: ' (替换模式)', rated: '已评分: ', watchedShort: '已看: ', skipped: '已跳过: ', notFound: '未找到: ', failed: '错误: ', errorNotFoundKP: '未在 Kinopoisk 上找到', errorNotFoundIMDb: '未在 IMDb 上找到', errorNotFoundLB: '未在 Letterboxd 上找到', errorApi: 'API 错误 / 网络故障', allImported: '🎉 所有记录已导入!', exportDone: '✅ 导出完成! 文件已保存。', deepSearchBtn: '🔍 深度搜索 ({count})', movies: '部电影', favorites: '收藏: ', likes: '赞', importFavorites: '导入收藏', language: '语言', exportHint: '将您在该平台的所有评分下载为 CSV 文件', importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分', hardImportHint: '从 CSV 导入并覆盖现有评分', importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表', runtime: '片长', directors: '导演', actors: '演员', premiereDate: '首映日期', languageHint: '选择界面语言', imdbNoData: '未找到评分或观看历史 — 请登录并在IMDb上评分电影', lblDetails: '详情', lblSearch: '搜索', lblApply: '应用', lblFavorites: '收藏', lblExisting: '现有', lblHistory: '历史', lblImport: '导入', lblPages: '翻页', }, ja: { time: '时间', exportRatings: '📤 評価をエクスポート', importRatings: '📥 インポート', hardImport: '🔄 強制インポート', loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)', kpParseFailed: 'Kinopoisk リストの解析に失敗しました', kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました', profileDetect: '{platform} プロフィールを検出中', loadedRecords: '{count} 件のレコードを読み込みました。{next}', checkingExisting: '既存の評価を確認中...', startingImport: 'インポートを開始中...', importProgress: '{platform} へのインポート {from}–{to}/{total}', searchProgress: '検索中 {from}–{to}/{total}', resolveProgress: '解決中 {from}–{to}/{total}', resolveIdCount: 'ID を解決中: {count} 作品', fetchingLid: 'LID を取得中: {count} 作品', applyProgress: '適用中 {from}–{to}/{total}', loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)', deepSearch: '詳細検索 {platform}', scanHistory: '{platform} の履歴をスキャン中', foundCount: '見つかりました: {count} 作品。CSV を生成中', userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません', ratings: '評価', watchHistory: '視聴履歴', diary: '日記', watched: '視聴済み', page: 'ページ', kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください', imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください', lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください', csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください', csvEmpty: '❌ CSV が空であるか認識できません', done: '✅ 完了{mode}!', replaceMode: ' (置換モード)', rated: '評価済み: ', watchedShort: '視聴済み: ', skipped: 'スキップ: ', notFound: '見つかりません: ', failed: 'エラー: ', errorNotFoundKP: 'Kinopoisk で見つかりません', errorNotFoundIMDb: 'IMDb で見つかりません', errorNotFoundLB: 'Letterboxd で見つかりません', errorApi: 'API エラー / ネットワーク障害', allImported: '🎉 すべてのレコードをインポートしました!', exportDone: '✅ エクスポート完了! ファイルを保存しました。', deepSearchBtn: '🔍 詳細検索 ({count})', movies: '作品', favorites: 'お気に入り: ', likes: 'いいね', importFavorites: 'お気に入りをインポート', language: '言語', exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード', importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます', hardImportHint: 'CSVからインポートし、既存の評価を上書きします', importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます', runtime: '上映時間', directors: '監督', actors: '出演者', premiereDate: '公開日', languageHint: 'インターフェース言語を選択', imdbNoData: '評価や視聴履歴が見つかりません — ログインしてIMDbで映画を評価してください', lblDetails: '詳細', lblSearch: '検索', lblApply: '適用', lblFavorites: 'お気に入り', lblExisting: '既存', lblHistory: '履歴', lblImport: 'インポート', lblPages: 'ページ', }, ko: { time: '시간', exportRatings: '📤 평점 내보내기', importRatings: '📥 가져오기', hardImport: '🔄 강제 가져오기', loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)', kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다', kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다', profileDetect: '{platform} 프로필 감지 중', loadedRecords: '{count}개 기록을 로드했습니다. {next}', checkingExisting: '기존 평점 확인 중...', startingImport: '가져오기 시작...', importProgress: '{platform} 가져오기 중 {from}–{to}/{total}', searchProgress: '검색 중 {from}–{to}/{total}', resolveProgress: '해결 중 {from}–{to}/{total}', resolveIdCount: 'ID 해결 중: {count}편', fetchingLid: 'LID 가져오는 중: {count}편', applyProgress: '적용 중 {from}–{to}/{total}', loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)', deepSearch: '심층 검색 {platform}', scanHistory: '{platform} 기록 스캔 중', foundCount: '찾음: {count}편. CSV 생성 중', userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다', ratings: '평점', watchHistory: '시청 기록', diary: '다이어리', watched: '시청함', page: '페이지', kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요', imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요', lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요', csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요', csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다', done: '✅ 완료{mode}!', replaceMode: ' (대체 모드)', rated: '평가됨: ', watchedShort: '시청함: ', skipped: '건너뜀: ', notFound: '찾을 수 없음: ', failed: '오류: ', errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음', errorNotFoundIMDb: 'IMDb에서 찾을 수 없음', errorNotFoundLB: 'Letterboxd에서 찾을 수 없음', errorApi: 'API 오류 / 네트워크 오류', allImported: '🎉 모든 기록을 가져왔습니다!', exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.', deepSearchBtn: '🔍 심층 검색 ({count})', movies: '편', favorites: '즐겨찾기: ', likes: '좋아요', importFavorites: '즐겨찾기 가져오기', language: '언어', exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드', importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다', hardImportHint: 'CSV에서 가져오고 기존 평점을 덮어씁니다', importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다', runtime: '상영 시간', directors: '감독', actors: '배우', premiereDate: '개봉일', languageHint: '인터페이스 언어 선택', imdbNoData: '평점이나 시청 기록이 없습니다 — 로그인 후 IMDb에서 영화를 평가하세요', lblDetails: '상세', lblSearch: '검색', lblApply: '적용', lblFavorites: '즐겨찾기', lblExisting: '기존', lblHistory: '기록', lblImport: '가져오기', lblPages: '페이지', }, };
+    const TRANSLATIONS = { en: { time: 'Time', exportRatings: '📤 Export Ratings', importRatings: '📥 Import', replaceAll: '🔄 Replace All', loadingPage: 'Loading page {p}{total} ({count} movies)', kpParseFailed: 'Failed to parse Kinopoisk listing — SSR JSON and HTML fallback failed', kpListingFailed: 'Failed to load Kinopoisk listing', profileDetect: 'Detecting {platform} profile', loadedRecords: 'Loaded {count} records. {next}', checkingExisting: 'Checking existing ratings...', startingImport: 'Starting import...', importProgress: 'Import to {platform} {from}–{to}/{total}', searchProgress: 'Search {from}–{to}/{total}', resolveProgress: 'Resolving {from}–{to}/{total}', resolveIdCount: 'Resolving IDs: {count} movies', fetchingLid: 'Fetching LID: {count} movies', applyProgress: 'Applying {from}–{to}/{total}', loadingExisting: 'Loading existing ratings: page {p}{total} ({count} movies)', hardImportRun: '🔄 Hard Import {platform}', scanHistory: 'Scanning {platform} history', foundCount: 'Found: {count} movies. Generating CSV', userIdWarn: '⚠️ Could not detect user ID — existing ratings will not be skipped', ratings: 'Ratings', watchHistory: 'Watch history', diary: 'Diary', watched: 'Watched', page: 'page', kpUserIdNotFound: 'User ID not found — open your Kinopoisk profile page', imdbUserIdNotFound: '❌ IMDb user ID not found — log in to your account', lbUsernameNotFound: 'Could not detect Letterboxd username — open your profile', csrfNotFound: '❌ CSRF token not found — log in to your Letterboxd account', csvEmpty: '❌ CSV is empty or not recognized', done: '✅ Done{mode}!', replaceMode: ' (replace mode)', rated: 'Rated: ', watchedShort: 'Watched: ', skipped: 'Skipped: ', notFound: 'Not found: ', failed: 'Errors: ', errorNotFoundKP: 'Not found on Kinopoisk', errorNotFoundIMDb: 'Not found on IMDb', errorNotFoundLB: 'Not found on Letterboxd', errorApi: 'API error / network failure', allImported: '🎉 All records imported!', exportDone: '✅ Export complete! File saved.', hardImportBtn: '🔄 Hard Import ({count})', hardImportBtnHint: 'Re-searches every missed title with extra spellings, transliterations and exact-ID bridges', movies: 'movies', favorites: 'Favorites: ', likes: 'Likes', importFavorites: 'Import favorites', language: 'Language', exportHint: 'Download all your ratings from this platform as a CSV file', importHint: 'Import ratings from a CSV file — existing ratings are kept,new ones are added', replaceAllHint: 'Import from CSV and overwrite every existing rating', importFavoritesHint: 'When enabled,films marked as favorites in the CSV will be added to your favorites list', runtime: 'Runtime', directors: 'Directors', actors: 'Actors', premiereDate: 'Premiere date', languageHint: 'Select the interface language', imdbNoData: 'No ratings or watch history found — make sure you are logged in and have rated films on IMDb', lblDetails: 'Details', lblSearch: 'Search', lblApply: 'Apply', lblFavorites: 'Favorites', lblExisting: 'Existing', lblHistory: 'History', lblImport: 'Import', lblPages: 'Pages', }, ru: { time: 'Время', exportRatings: '📤 Экспорт оценок', importRatings: '📥 Импорт', replaceAll: '🔄 Заменить всё', loadingPage: 'Загрузка стр. {p}{total} ({count} фильмов)', kpParseFailed: 'Не удалось распарсить листинг КП — SSR JSON и HTML fallback не сработали', kpListingFailed: 'Не удалось загрузить листинг КП', profileDetect: 'Определяем профиль {platform}', loadedRecords: 'Загружено {count} записей. {next}', checkingExisting: 'Проверяем существующие оценки...', startingImport: 'Начинаем импорт...', importProgress: 'Импорт на {platform} {from}–{to}/{total}', searchProgress: 'Поиск {from}–{to}/{total}', resolveProgress: 'Резолвинг {from}–{to}/{total}', resolveIdCount: 'Резолвинг ID: {count} фильмов', fetchingLid: 'Получение LID: {count} фильмов', applyProgress: 'Применение {from}–{to}/{total}', loadingExisting: 'Загрузка существующих оценок: стр. {p}{total} ({count} фильмов)', hardImportRun: '🔄 Жёсткий импорт {platform}', scanHistory: 'Сканируем историю {platform}', foundCount: 'Найдено: {count} фильмов. Формируем CSV', userIdWarn: '⚠️ Не удалось определить user ID — существующие оценки не будут пропущены', ratings: 'Оценки', watchHistory: 'Просмотры', diary: 'Дневник', watched: 'Просмотрено', page: 'стр.', kpUserIdNotFound: 'user ID не найден — откройте страницу профиля КП', imdbUserIdNotFound: '❌ IMDb user ID не найден — войдите в аккаунт', lbUsernameNotFound: 'Не удалось определить имя пользователя Letterboxd — откройте свой профиль', csrfNotFound: '❌ CSRF токен не найден — войдите в аккаунт Letterboxd', csvEmpty: '❌ CSV пуст или не распознан', done: '✅ Готово{mode}!', replaceMode: ' (режим замены)', rated: 'Оценено: ', watchedShort: 'Просмотрено: ', skipped: 'Пропущено: ', notFound: 'Не найдено: ', failed: 'Ошибок: ', errorNotFoundKP: 'Не найдено на Кинопоиске', errorNotFoundIMDb: 'Не найдено на IMDb', errorNotFoundLB: 'Не найдено на Letterboxd', errorApi: 'Ошибка API / сетевой сбой', allImported: '🎉 Все записи импортированы!', exportDone: '✅ Экспорт завершён! Файл сохранён.', hardImportBtn: '🔄 Жёсткий импорт ({count})', hardImportBtnHint: 'Повторно ищет каждую пропущенную строку: другие написания, транслит, точные ID', movies: 'фильмов', favorites: 'Избранное: ', likes: 'Лайки', importFavorites: 'Импортировать избранное', language: 'Язык', exportHint: 'Выгрузить все ваши оценки с этого сайта в CSV-файл', importHint: 'Импорт оценок из CSV — существующие оценки сохраняются,новые добавляются', replaceAllHint: 'Импорт из CSV с перезаписью ВСЕХ существующих оценок', importFavoritesHint: 'Если включено,фильмы-избранники из CSV будут добавлены в ваш список избранного', runtime: 'Длительность', directors: 'Режиссёры', actors: 'Актёры', premiereDate: 'Дата премьеры', languageHint: 'Выбор языка интерфейса', imdbNoData: 'Нет оценок или истории просмотров — убедитесь, что вы вошли в аккаунт и оценили фильмы на IMDb', lblDetails: 'Детали', lblSearch: 'Поиск', lblApply: 'Применение', lblFavorites: 'Избранное', lblExisting: 'Существующие', lblHistory: 'История', lblImport: 'Импорт', lblPages: 'Страницы', }, es: { time: 'Tiempo', exportRatings: '📤 Exportar valoraciones', importRatings: '📥 Importar', replaceAll: '🔄 Reemplazar todo', loadingPage: 'Cargando pág. {p}{total} ({count} películas)', kpParseFailed: 'Error al analizar el listado de Kinopoisk', kpListingFailed: 'Error al cargar el listado de Kinopoisk', profileDetect: 'Detectando perfil de {platform}', loadedRecords: 'Cargados {count} registros. {next}', checkingExisting: 'Comprobando valoraciones existentes...', startingImport: 'Iniciando importación...', importProgress: 'Importando a {platform} {from}–{to}/{total}', searchProgress: 'Buscando {from}–{to}/{total}', resolveProgress: 'Resolviendo {from}–{to}/{total}', resolveIdCount: 'Resolviendo IDs: {count} películas', fetchingLid: 'Obteniendo LID: {count} películas', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Cargando valoraciones: pág. {p}{total} ({count} películas)', hardImportRun: '🔄 Importación extrema {platform}', scanHistory: 'Escaneando historial de {platform}', foundCount: 'Encontradas: {count} películas. Generando CSV', userIdWarn: '⚠️ No se detectó el user ID — no se omitirán valoraciones existentes', ratings: 'Valoraciones', watchHistory: 'Historial', diary: 'Diario', watched: 'Visto', page: 'página', kpUserIdNotFound: 'User ID no encontrado — abre tu perfil de Kinopoisk', imdbUserIdNotFound: '❌ User ID de IMDb no encontrado — inicia sesión', lbUsernameNotFound: 'No se detectó el usuario de Letterboxd — abre tu perfil', csrfNotFound: '❌ Token CSRF no encontrado — inicia sesión en Letterboxd', csvEmpty: '❌ CSV vacío o no reconocido', done: '✅ ¡Listo{mode}!', replaceMode: ' (modo reemplazo)', rated: 'Valorado: ', watchedShort: 'Visto: ', skipped: 'Omitido: ', notFound: 'No encontrado: ', failed: 'Errores: ', errorNotFoundKP: 'No encontrado en Kinopoisk', errorNotFoundIMDb: 'No encontrado en IMDb', errorNotFoundLB: 'No encontrado en Letterboxd', errorApi: 'Error de API / fallo de red', allImported: '🎉 ¡Todos los registros importados!', exportDone: '✅ ¡Exportación completa! Archivo guardado.', hardImportBtn: '🔄 Importación extrema ({count})', hardImportBtnHint: 'Reintenta cada título fallido: más variantes, transliteraciones e ID exactos', movies: 'películas', favorites: 'Favoritos: ', likes: 'Me gusta', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Descarga todas tus valoraciones de esta plataforma como archivo CSV', importHint: 'Importa valoraciones desde CSV — las existentes se conservan,las nuevas se añaden', replaceAllHint: 'Importa desde CSV y sobrescribe todas las valoraciones', importFavoritesHint: 'Si está activado,las películas marcadas como favoritas en el CSV se añadirán a tu lista', runtime: 'Duración', directors: 'Directores', actors: 'Actores', premiereDate: 'Fecha de estreno', languageHint: 'Selecciona el idioma de la interfaz', imdbNoData: 'No se encontraron valoraciones ni historial — inicia sesión y valora películas en IMDb', lblDetails: 'Detalles', lblSearch: 'Búsqueda', lblApply: 'Aplicar', lblFavorites: 'Favoritos', lblExisting: 'Existentes', lblHistory: 'Historial', lblImport: 'Importar', lblPages: 'Páginas', }, fr: { time: 'Temps', exportRatings: '📤 Exporter les notes', importRatings: '📥 Importer', replaceAll: '🔄 Tout remplacer', loadingPage: 'Chargement p. {p}{total} ({count} films)', kpParseFailed: "Échec de l'analyse du listing Kinopoisk", kpListingFailed: 'Échec du chargement du listing Kinopoisk', profileDetect: 'Détection du profil {platform}', loadedRecords: '{count} enregistrements chargés. {next}', checkingExisting: 'Vérification des notes existantes...', startingImport: "Démarrage de l'importation...", importProgress: 'Importation vers {platform} {from}–{to}/{total}', searchProgress: 'Recherche {from}–{to}/{total}', resolveProgress: 'Résolution {from}–{to}/{total}', resolveIdCount: 'Résolution des IDs: {count} films', fetchingLid: 'Récupération LID: {count} films', applyProgress: 'Application {from}–{to}/{total}', loadingExisting: 'Chargement des notes: p. {p}{total} ({count} films)', hardImportRun: '🔄 Importation extrême {platform}', scanHistory: "Analyse de l'historique {platform}", foundCount: 'Trouvés: {count} films. Génération CSV', userIdWarn: '⚠️ ID utilisateur non détecté — les notes existantes ne seront pas ignorées', ratings: 'Notes', watchHistory: 'Historique', diary: 'Journal', watched: 'Vu', page: 'page', kpUserIdNotFound: 'ID utilisateur introuvable — ouvrez votre profil Kinopoisk', imdbUserIdNotFound: '❌ ID IMDb introuvable — connectez-vous', lbUsernameNotFound: 'Utilisateur Letterboxd non détecté — ouvrez votre profil', csrfNotFound: '❌ Token CSRF introuvable — connectez-vous à Letterboxd', csvEmpty: '❌ CSV vide ou non reconnu', done: '✅ Terminé{mode}!', replaceMode: ' (mode remplacement)', rated: 'Noté: ', watchedShort: 'Vu: ', skipped: 'Ignoré: ', notFound: 'Introuvable: ', failed: 'Erreurs: ', errorNotFoundKP: 'Non trouvé sur Kinopoisk', errorNotFoundIMDb: 'Non trouvé sur IMDb', errorNotFoundLB: 'Non trouvé sur Letterboxd', errorApi: 'Erreur API / problème réseau', allImported: '🎉 Tous les enregistrements importés!', exportDone: '✅ Export terminé! Fichier sauvegardé.', hardImportBtn: '🔄 Importation extrême ({count})', hardImportBtnHint: 'Relance chaque titre manqué : variantes, translittérations et ID exacts', movies: 'films', favorites: 'Favoris: ', likes: 'J\'aime', importFavorites: 'Importer les favoris', language: 'Langue', exportHint: 'Télécharge toutes vos notes depuis cette plateforme en fichier CSV', importHint: 'Importe les notes depuis un CSV — les notes existantes sont conservées,les nouvelles ajoutées', replaceAllHint: 'Importe depuis CSV et écrase toutes les notes', importFavoritesHint: 'Si activé,les films marqués favoris dans le CSV seront ajoutés à vos favoris', runtime: 'Durée', directors: 'Réalisateurs', actors: 'Acteurs', premiereDate: 'Date de sortie', languageHint: 'Sélectionnez la langue de l\'interface — la page se rechargera', imdbNoData: 'Aucune note ni historique trouvé — connectez-vous et notez des films sur IMDb', lblDetails: 'Détails', lblSearch: 'Recherche', lblApply: 'Appliquer', lblFavorites: 'Favoris', lblExisting: 'Existants', lblHistory: 'Historique', lblImport: 'Importer', lblPages: 'Pages', }, de: { time: 'Zeit', exportRatings: '📤 Bewertungen exportieren', importRatings: '📥 Importieren', replaceAll: '🔄 Alles ersetzen', loadingPage: 'Lade Seite {p}{total} ({count} Filme)', kpParseFailed: 'Kinopoisk-Liste konnte nicht geparst werden', kpListingFailed: 'Kinopoisk-Liste konnte nicht geladen werden', profileDetect: 'Erkenne {platform}-Profil', loadedRecords: '{count} Einträge geladen. {next}', checkingExisting: 'Prüfe bestehende Bewertungen...', startingImport: 'Starte Import...', importProgress: 'Importiere zu {platform} {from}–{to}/{total}', searchProgress: 'Suche {from}–{to}/{total}', resolveProgress: 'Auflösen {from}–{to}/{total}', resolveIdCount: 'Löse IDs auf: {count} Filme', fetchingLid: 'Hole LID: {count} Filme', applyProgress: 'Wende an {from}–{to}/{total}', loadingExisting: 'Lade bestehende Bewertungen: Seite {p}{total} ({count} Filme)', hardImportRun: '🔄 Hartimport {platform}', scanHistory: 'Scanne {platform}-Verlauf', foundCount: 'Gefunden: {count} Filme. Erstelle CSV', userIdWarn: '⚠️ User ID nicht erkannt — bestehende Bewertungen werden nicht übersprungen', ratings: 'Bewertungen', watchHistory: 'Verlauf', diary: 'Tagebuch', watched: 'Gesehen', page: 'Seite', kpUserIdNotFound: 'User ID nicht gefunden — öffne dein Kinopoisk-Profil', imdbUserIdNotFound: '❌ IMDb User ID nicht gefunden — bitte anmelden', lbUsernameNotFound: 'Letterboxd-Name nicht erkannt — öffne dein Profil', csrfNotFound: '❌ CSRF-Token nicht gefunden — bitte bei Letterboxd anmelden', csvEmpty: '❌ CSV leer oder nicht erkannt', done: '✅ Fertig{mode}!', replaceMode: ' (Ersetzungsmodus)', rated: 'Bewertet: ', watchedShort: 'Gesehen: ', skipped: 'Übersprungen: ', notFound: 'Nicht gefunden: ', failed: 'Fehler: ', errorNotFoundKP: 'Nicht gefunden auf Kinopoisk', errorNotFoundIMDb: 'Nicht gefunden auf IMDb', errorNotFoundLB: 'Nicht gefunden auf Letterboxd', errorApi: 'API-Fehler / Netzwerkfehler', allImported: '🎉 Alle Einträge importiert!', exportDone: '✅ Export abgeschlossen! Datei gespeichert.', hardImportBtn: '🔄 Hartimport ({count})', hardImportBtnHint: 'Wiederholt jeden verpassten Titel: Schreibweisen, Transliteration, exakte IDs', movies: 'Filme', favorites: 'Favoriten: ', likes: 'Gefällt mir', importFavorites: 'Favoriten importieren', language: 'Sprache', exportHint: 'Lädt alle deine Bewertungen von dieser Plattform als CSV-Datei herunter', importHint: 'Importiert Bewertungen aus CSV — bestehende bleiben,neue werden hinzugefügt', replaceAllHint: 'Importiert aus CSV und überschreibt alle Bewertungen', importFavoritesHint: 'Wenn aktiviert,werden als Favorits markierte Filme aus dem CSV zu Favoriten hinzugefügt', runtime: 'Laufzeit', directors: 'Regisseur', actors: 'Schauspieler', premiereDate: 'Premiere', languageHint: 'Wähle die Sprache der Oberfläche', imdbNoData: 'Keine Bewertungen oder Verlauf gefunden — melde dich an und bewerte Filme auf IMDb', lblDetails: 'Details', lblSearch: 'Suche', lblApply: 'Anwenden', lblFavorites: 'Favoriten', lblExisting: 'Vorhandene', lblHistory: 'Verlauf', lblImport: 'Import', lblPages: 'Seiten', }, pt: { time: 'Tempo', exportRatings: '📤 Exportar avaliações', importRatings: '📥 Importar', replaceAll: '🔄 Substituir tudo', loadingPage: 'Carregando pág. {p}{total} ({count} filmes)', kpParseFailed: 'Falha ao analisar listagem do Kinopoisk', kpListingFailed: 'Falha ao carregar listagem do Kinopoisk', profileDetect: 'Detectando perfil {platform}', loadedRecords: '{count} registros carregados. {next}', checkingExisting: 'Verificando avaliações existentes...', startingImport: 'Iniciando importação...', importProgress: 'Importando para {platform} {from}–{to}/{total}', searchProgress: 'Pesquisando {from}–{to}/{total}', resolveProgress: 'Resolvendo {from}–{to}/{total}', resolveIdCount: 'Resolvendo IDs: {count} filmes', fetchingLid: 'Obtendo LID: {count} filmes', applyProgress: 'Aplicando {from}–{to}/{total}', loadingExisting: 'Carregando avaliações: pág. {p}{total} ({count} filmes)', hardImportRun: '🔄 Importação extrema {platform}', scanHistory: 'Escaneando histórico {platform}', foundCount: 'Encontrados: {count} filmes. Gerando CSV', userIdWarn: '⚠️ ID do usuário não detectado — avaliações existentes não serão ignoradas', ratings: 'Avaliações', watchHistory: 'Histórico', diary: 'Diário', watched: 'Assistido', page: 'página', kpUserIdNotFound: 'ID do usuário não encontrado — abra seu perfil no Kinopoisk', imdbUserIdNotFound: '❌ ID do IMDb não encontrado — faça login', lbUsernameNotFound: 'Usuário do Letterboxd não detectado — abra seu perfil', csrfNotFound: '❌ Token CSRF não encontrado — faça login no Letterboxd', csvEmpty: '❌ CSV vazio ou não reconhecido', done: '✅ Concluído{mode}!', replaceMode: ' (modo substituição)', rated: 'Avaliado: ', watchedShort: 'Assistido: ', skipped: 'Ignorado: ', notFound: 'Não encontrado: ', failed: 'Erros: ', errorNotFoundKP: 'Não encontrado no Kinopoisk', errorNotFoundIMDb: 'Não encontrado no IMDb', errorNotFoundLB: 'Não encontrado no Letterboxd', errorApi: 'Erro de API / falha de rede', allImported: '🎉 Todos os registros importados!', exportDone: '✅ Exportação concluída! Arquivo salvo.', hardImportBtn: '🔄 Importação extrema ({count})', hardImportBtnHint: 'Repete cada título não encontrado: variantes, transliterações e IDs exatos', movies: 'filmes', favorites: 'Favoritos: ', likes: 'Curtidas', importFavorites: 'Importar favoritos', language: 'Idioma', exportHint: 'Baixa todas as suas avaliações desta plataforma como arquivo CSV', importHint: 'Importa avaliações de CSV — existentes são mantidas,novas são adicionadas', replaceAllHint: 'Importa de CSV e sobrescreve todas as avaliações', importFavoritesHint: 'Se ativado,filmes marcados como favoritos no CSV serão adicionados aos seus favoritos', runtime: 'Duração', directors: 'Diretores', actors: 'Atores', premiereDate: 'Data de estreia', languageHint: 'Selecione o idioma da interface', imdbNoData: 'Nenhuma avaliação ou histórico encontrado — faça login e avalie filmes no IMDb', lblDetails: 'Detalhes', lblSearch: 'Busca', lblApply: 'Aplicar', lblFavorites: 'Favoritos', lblExisting: 'Existentes', lblHistory: 'Histórico', lblImport: 'Importar', lblPages: 'Páginas', }, zh: { time: '时间', exportRatings: '📤 导出评分', importRatings: '📥 导入', replaceAll: '🔄 全部替换', loadingPage: '加载第 {p}{total} 页 ({count} 部电影)', kpParseFailed: '无法解析 Kinopoisk 列表', kpListingFailed: '无法加载 Kinopoisk 列表', profileDetect: '正在检测 {platform} 个人资料', loadedRecords: '已加载 {count} 条记录。{next}', checkingExisting: '正在检查现有评分...', startingImport: '开始导入...', importProgress: '正在导入到 {platform} {from}–{to}/{total}', searchProgress: '搜索中 {from}–{to}/{total}', resolveProgress: '解析中 {from}–{to}/{total}', resolveIdCount: '解析 ID: {count} 部电影', fetchingLid: '获取 LID: {count} 部电影', applyProgress: '应用中 {from}–{to}/{total}', loadingExisting: '加载现有评分: 第 {p}{total} 页 ({count} 部电影)', hardImportRun: '🔄 硬核导入 {platform}', scanHistory: '扫描 {platform} 历史记录', foundCount: '找到: {count} 部电影。正在生成 CSV', userIdWarn: '⚠️ 无法检测到用户 ID — 不会跳过现有评分', ratings: '评分', watchHistory: '观看历史', diary: '日记', watched: '已看', page: '页', kpUserIdNotFound: '未找到用户 ID — 请打开 Kinopoisk 个人资料页面', imdbUserIdNotFound: '❌ 未找到 IMDb 用户 ID — 请登录账户', lbUsernameNotFound: '无法检测到 Letterboxd 用户名 — 请打开个人资料', csrfNotFound: '❌ 未找到 CSRF 令牌 — 请登录 Letterboxd', csvEmpty: '❌ CSV 为空或无法识别', done: '✅ 完成{mode}!', replaceMode: ' (替换模式)', rated: '已评分: ', watchedShort: '已看: ', skipped: '已跳过: ', notFound: '未找到: ', failed: '错误: ', errorNotFoundKP: '未在 Kinopoisk 上找到', errorNotFoundIMDb: '未在 IMDb 上找到', errorNotFoundLB: '未在 Letterboxd 上找到', errorApi: 'API 错误 / 网络故障', allImported: '🎉 所有记录已导入!', exportDone: '✅ 导出完成! 文件已保存。', hardImportBtn: '🔄 硬核导入 ({count})', hardImportBtnHint: '重新搜索每个未匹配的片名：更多拼写、音译与精确 ID', movies: '部电影', favorites: '收藏: ', likes: '赞', importFavorites: '导入收藏', language: '语言', exportHint: '将您在该平台的所有评分下载为 CSV 文件', importHint: '从 CSV 导入评分 — 保留现有评分，添加新评分', replaceAllHint: '从 CSV 导入并覆盖全部现有评分', importFavoritesHint: '启用后，CSV 中标记为收藏的电影将被添加到您的收藏列表', runtime: '片长', directors: '导演', actors: '演员', premiereDate: '首映日期', languageHint: '选择界面语言', imdbNoData: '未找到评分或观看历史 — 请登录并在IMDb上评分电影', lblDetails: '详情', lblSearch: '搜索', lblApply: '应用', lblFavorites: '收藏', lblExisting: '现有', lblHistory: '历史', lblImport: '导入', lblPages: '翻页', }, ja: { time: '时间', exportRatings: '📤 評価をエクスポート', importRatings: '📥 インポート', replaceAll: '🔄 すべて置換', loadingPage: 'ページ {p}{total} を読み込み中 ({count} 作品)', kpParseFailed: 'Kinopoisk リストの解析に失敗しました', kpListingFailed: 'Kinopoisk リストの読み込みに失敗しました', profileDetect: '{platform} プロフィールを検出中', loadedRecords: '{count} 件のレコードを読み込みました。{next}', checkingExisting: '既存の評価を確認中...', startingImport: 'インポートを開始中...', importProgress: '{platform} へのインポート {from}–{to}/{total}', searchProgress: '検索中 {from}–{to}/{total}', resolveProgress: '解決中 {from}–{to}/{total}', resolveIdCount: 'ID を解決中: {count} 作品', fetchingLid: 'LID を取得中: {count} 作品', applyProgress: '適用中 {from}–{to}/{total}', loadingExisting: '既存の評価を読み込み中: ページ {p}{total} ({count} 作品)', hardImportRun: '🔄 ハードインポート {platform}', scanHistory: '{platform} の履歴をスキャン中', foundCount: '見つかりました: {count} 作品。CSV を生成中', userIdWarn: '⚠️ ユーザー ID を検出できません — 既存の評価をスキップしません', ratings: '評価', watchHistory: '視聴履歴', diary: '日記', watched: '視聴済み', page: 'ページ', kpUserIdNotFound: 'ユーザー ID が見つかりません — Kinopoisk プロフィールページを開いてください', imdbUserIdNotFound: '❌ IMDb ユーザー ID が見つかりません — ログインしてください', lbUsernameNotFound: 'Letterboxd ユーザー名を検出できません — プロフィールを開いてください', csrfNotFound: '❌ CSRF トークンが見つかりません — Letterboxd にログインしてください', csvEmpty: '❌ CSV が空であるか認識できません', done: '✅ 完了{mode}!', replaceMode: ' (置換モード)', rated: '評価済み: ', watchedShort: '視聴済み: ', skipped: 'スキップ: ', notFound: '見つかりません: ', failed: 'エラー: ', errorNotFoundKP: 'Kinopoisk で見つかりません', errorNotFoundIMDb: 'IMDb で見つかりません', errorNotFoundLB: 'Letterboxd で見つかりません', errorApi: 'API エラー / ネットワーク障害', allImported: '🎉 すべてのレコードをインポートしました!', exportDone: '✅ エクスポート完了! ファイルを保存しました。', hardImportBtn: '🔄 ハードインポート ({count})', hardImportBtnHint: '一致しなかった全作品を再検索：表記ゆれ・音訳・正確な ID', movies: '作品', favorites: 'お気に入り: ', likes: 'いいね', importFavorites: 'お気に入りをインポート', language: '言語', exportHint: 'このプラットフォームのすべての評価をCSVファイルとしてダウンロード', importHint: 'CSVから評価をインポート — 既存の評価は保持、新しい評価が追加されます', replaceAllHint: 'CSVからインポートし、すべての評価を上書きします', importFavoritesHint: '有効にすると、CSVでお気に入りとマークされた映画がお気に入りリストに追加されます', runtime: '上映時間', directors: '監督', actors: '出演者', premiereDate: '公開日', languageHint: 'インターフェース言語を選択', imdbNoData: '評価や視聴履歴が見つかりません — ログインしてIMDbで映画を評価してください', lblDetails: '詳細', lblSearch: '検索', lblApply: '適用', lblFavorites: 'お気に入り', lblExisting: '既存', lblHistory: '履歴', lblImport: 'インポート', lblPages: 'ページ', }, ko: { time: '시간', exportRatings: '📤 평점 내보내기', importRatings: '📥 가져오기', replaceAll: '🔄 전체 교체', loadingPage: '페이지 {p}{total} 로드 중 ({count} 편)', kpParseFailed: 'Kinopoisk 목록을 분석할 수 없습니다', kpListingFailed: 'Kinopoisk 목록을 불러올 수 없습니다', profileDetect: '{platform} 프로필 감지 중', loadedRecords: '{count}개 기록을 로드했습니다. {next}', checkingExisting: '기존 평점 확인 중...', startingImport: '가져오기 시작...', importProgress: '{platform} 가져오기 중 {from}–{to}/{total}', searchProgress: '검색 중 {from}–{to}/{total}', resolveProgress: '해결 중 {from}–{to}/{total}', resolveIdCount: 'ID 해결 중: {count}편', fetchingLid: 'LID 가져오는 중: {count}편', applyProgress: '적용 중 {from}–{to}/{total}', loadingExisting: '기존 평점 로드 중: 페이지 {p}{total} ({count}편)', hardImportRun: '🔄 하드 가져오기 {platform}', scanHistory: '{platform} 기록 스캔 중', foundCount: '찾음: {count}편. CSV 생성 중', userIdWarn: '⚠️ 사용자 ID를 감지할 수 없습니다 — 기존 평점을 건너뛰지 않습니다', ratings: '평점', watchHistory: '시청 기록', diary: '다이어리', watched: '시청함', page: '페이지', kpUserIdNotFound: '사용자 ID를 찾을 수 없습니다 — Kinopoisk 프로필 페이지를 여세요', imdbUserIdNotFound: '❌ IMDb 사용자 ID를 찾을 수 없습니다 — 로그인하세요', lbUsernameNotFound: 'Letterboxd 사용자 이름을 감지할 수 없습니다 — 프로필을 여세요', csrfNotFound: '❌ CSRF 토큰을 찾을 수 없습니다 — Letterboxd에 로그인하세요', csvEmpty: '❌ CSV가 비어 있거나 인식할 수 없습니다', done: '✅ 완료{mode}!', replaceMode: ' (대체 모드)', rated: '평가됨: ', watchedShort: '시청함: ', skipped: '건너뜀: ', notFound: '찾을 수 없음: ', failed: '오류: ', errorNotFoundKP: 'Kinopoisk에서 찾을 수 없음', errorNotFoundIMDb: 'IMDb에서 찾을 수 없음', errorNotFoundLB: 'Letterboxd에서 찾을 수 없음', errorApi: 'API 오류 / 네트워크 오류', allImported: '🎉 모든 기록을 가져왔습니다!', exportDone: '✅ 내보내기 완료! 파일이 저장되었습니다.', hardImportBtn: '🔄 하드 가져오기 ({count})', hardImportBtnHint: '일치하지 않은 모든 작품 재검색: 표기 변형, 음역, 정확한 ID', movies: '편', favorites: '즐겨찾기: ', likes: '좋아요', importFavorites: '즐겨찾기 가져오기', language: '언어', exportHint: '이 플랫폼의 모든 평점을 CSV 파일로 다운로드', importHint: 'CSV에서 평점 가져오기 — 기존 평점은 유지,새 평점이 추가됩니다', replaceAllHint: 'CSV에서 가져오고 모든 기존 평점을 덮어씁니다', importFavoritesHint: '활성화하면 CSV에서 즐겨찾기로 표시된 영화가 즐겨찾기 목록에 추가됩니다', runtime: '상영 시간', directors: '감독', actors: '배우', premiereDate: '개봉일', languageHint: '인터페이스 언어 선택', imdbNoData: '평점이나 시청 기록이 없습니다 — 로그인 후 IMDb에서 영화를 평가하세요', lblDetails: '상세', lblSearch: '검색', lblApply: '적용', lblFavorites: '즐겨찾기', lblExisting: '기존', lblHistory: '기록', lblImport: '가져오기', lblPages: '페이지', }, };
 
     function getLocale() {
         // Check localStorage for user-saved language preference
@@ -121,7 +121,7 @@
         const btnReplace = panel.querySelector('.mrs-btn--danger');
         if (btnExport) { btnExport.textContent = t('exportRatings'); btnExport.title = t('exportHint'); }
         if (btnImport) { btnImport.textContent = t('importRatings'); btnImport.title = t('importHint'); }
-        if (btnReplace) { btnReplace.textContent = t('hardImport'); btnReplace.title = t('hardImportHint'); }
+        if (btnReplace) { btnReplace.textContent = t('replaceAll'); btnReplace.title = t('replaceAllHint'); }
         const labelFav = panel.querySelector('.mrs-opts__row');
         if (labelFav) {
             labelFav.title = t('importFavoritesHint');
@@ -1182,6 +1182,24 @@
     // Weights based on reliability of each data field
     // extraTitles: additional query variants (transliterations, alt titles) used to find the candidate.
 
+    // How two normalized titles relate. This decides whether a match may be
+    // written, so the cases are kept apart instead of collapsed into "contains":
+    //   exact  — the same title in any known spelling;
+    //   prefix — one is the other plus a subtitle ("leon" / "leon the professional").
+    //            The normal way a row carries a shortened title;
+    //   none   — shared words in the middle ("matrix" in "a glitch in the matrix"),
+    //            which is exactly how unrelated films get mixed up.
+    function titleMatchKind(a, b) {
+        if (!a || !b) return '';
+        if (a === b) return 'exact';
+        const shorter = a.length <= b.length ? a : b;
+        const longer = a.length <= b.length ? b : a;
+        // Word boundary only: "alien" is not a prefix of "aliens", and a bare
+        // "scream" is a prefix of "scream 2" (hence the year gate downstream).
+        if (shorter.length >= 3 && longer.startsWith(shorter + ' ')) return 'prefix';
+        return '';
+    }
+
     // Normalize a type string (IMDb qid / KP CSV type) into a coarse family.
     function typeFamily(t) {
         const s = String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1202,28 +1220,39 @@
     // win via a weak substring match — a plain film row would otherwise map to "The Making of X".
     const DERIVATIVE_TYPES = new Set(['video', 'music', 'special', 'episode', 'doc', 'tvmovie']);
 
-    function scoreCandidate(source, candidate, extraTitles = []) {
+    // Full scoring result. scoreCandidate() below keeps the numeric API, but the
+    // importers need to know *why* a candidate scored: a 500 that came from an
+    // exact title is a safe match, a 650 that came from a shared substring is a
+    // guess and must never be written in a standard import.
+    function scoreCandidateDetail(source, candidate, extraTitles = []) {
         let score = 0;
         const parts = [];
 
         // 1. External IDs (highest priority)
+        let idExact = false;
         if (candidate.ttId && source.ttId && candidate.ttId === source.ttId) {
             score += 1000; parts.push('+1000 IMDb ID');
+            idExact = true;
         }
 
         // 2. Original Title Exact
         const srcTitle = source.titleOrig || source.titleRu || source.title || '';
         const candTitle = candidate.titleOrig || candidate.titleRu || candidate.title || '';
         const nCand = normTitle(candTitle);
-        // All title variants to compare against: primary + allTitles + translit + extraTitles
-        const titlePool = [srcTitle];
-        if (Array.isArray(source.allTitles)) titlePool.push(...source.allTitles);
-        if (hasCyr(srcTitle)) titlePool.push(translit(srcTitle));
-        titlePool.push(...extraTitles.filter(Boolean));
+        // The row's own names (primary + transliteration + caller-supplied
+        // variants) are one kind of evidence; the AllTitles column is another.
+        // The difference matters: a KP export can list *another film of the same
+        // collection* in AllTitles (the row "Il buono, il brutto, il cattivo"
+        // carries "Per un pugno di dollari"), so an alternative name may never
+        // be trusted the same way the row title is.
+        const primaryPool = [srcTitle];
+        if (hasCyr(srcTitle)) primaryPool.push(translit(srcTitle));
+        primaryPool.push(...extraTitles.filter(Boolean));
+        const altPool = Array.isArray(source.allTitles) ? source.allTitles : [];
         let titleMatched = false;
         let titleKind = ''; // 'exact' | 'substring' | ''
-        // Exact match against any variant
-        for (const t of titlePool) {
+        // Exact match against any row-title spelling
+        for (const t of primaryPool) {
             const n = normTitle(t);
             if (n && n === nCand) {
                 score += 500; parts.push('+500 Title');
@@ -1234,7 +1263,7 @@
         // Clean-title match (strips years, quotes, etc.)
         if (!titleMatched) {
             const cCand = cleanTitle(candTitle);
-            for (const t of titlePool) {
+            for (const t of primaryPool) {
                 const c = cleanTitle(t);
                 if (c && cCand && normTitle(c) === normTitle(cCand)) {
                     score += 480; parts.push('+480 Clean Title');
@@ -1244,27 +1273,38 @@
             }
         }
 
-        // Substring/includes match (e.g. Leon in Leon: The Professional).
-        // Denied for derivative types — a film row must not map to "The Making of X" / "X: Interviews" / trailers.
+        // Subtitle / shortened-title match: only a prefix relation ("Leon" vs
+        // "Leon: The Professional", "The Raid" vs "The Raid: Redemption"). A
+        // title that merely contains the query somewhere inside ("The Matrix"
+        // in "A Glitch in the Matrix") is how unrelated films got mixed up, so
+        // it earns nothing. Denied for derivative types — a film row must not
+        // map to "The Making of X" / "X: Interviews" / trailers either.
         if (!titleMatched && nCand && !DERIVATIVE_TYPES.has(typeFamily(candidate.type))) {
-            for (const t of titlePool) {
+            for (const t of primaryPool) {
                 const n = normTitle(t);
-                if (n && n.length >= 3 && nCand.length >= 3 && (nCand.includes(n) || n.includes(nCand))) {
-                    score += 350; parts.push('+350 Substring Title');
+                if (titleMatchKind(n, nCand) === 'prefix') {
+                    score += 350; parts.push('+350 Subtitle Title');
                     titleMatched = true; titleKind = 'substring';
                     break;
                 }
             }
         }
 
-        // 3. Alternative Title Exact (legacy path; titlePool already covers allTitles)
-        if (!titleMatched && source.allTitles && source.allTitles.length && nCand) {
-            for (const alt of source.allTitles) {
-                const nAlt = normTitle(alt);
-                if (nAlt === nCand) {
-                    score += 450; parts.push('+450 Alt Title');
-                    titleMatched = true; titleKind = 'exact';
-                    break;
+        // 3. Alternative Title Exact. A real bridge between languages, but only
+        // as an exact name in a compatible year: a shortened or prefixed
+        // alternative ("Yojinbo" for "Yojinbo ichiba") is how a completely
+        // different film gets picked, and an allTitles entry may belong to a
+        // sibling film of the same collection.
+        if (!titleMatched && altPool.length && nCand) {
+            const yearUsable = !source.year || !candidate.year || yearsMatch(candidate.year, source.year);
+            if (yearUsable) {
+                for (const alt of altPool) {
+                    const nAlt = normTitle(alt);
+                    if (nAlt && nAlt === nCand) {
+                        score += 450; parts.push('+450 Alt Title');
+                        titleMatched = true; titleKind = 'exact';
+                        break;
+                    }
                 }
             }
         }
@@ -1280,8 +1320,11 @@
         // 2b. Suggest rank bonus: candidate was the TOP result AND year matches — strong signal,
         // even for substring matches (e.g. the real "Rogue One: A Star Wars Story" is rank 0 for "Rogue One",
         // while the fan-edit "Rogue One" (2017) only gets an exact-title-but-wrong-year match).
+        let topSuggestYear = false;
+        let yearExact = false;
         if (titleKind !== 'exact' && candidate.suggestRank === 0 && source.year && candidate.year && yearsMatch(candidate.year, source.year)) {
             score += 280; parts.push('+280 Top Suggest + Year');
+            topSuggestYear = true;
         }
 
         // 5. Year
@@ -1290,7 +1333,7 @@
             const cYr = String(candidate.year).match(/\d{4}/);
             if (sYr && cYr) {
                 const y1 = parseInt(sYr[0], 10), y2 = parseInt(cYr[0], 10);
-                if (y1 === y2) { score += 300; parts.push('+300 Year Exact'); }
+                if (y1 === y2) { score += 300; parts.push('+300 Year Exact'); yearExact = true; }
                 else if (Math.abs(y1 - y2) <= YEAR_TOL) { score += 250; parts.push('+250 Year +/-1'); }
             }
         }
@@ -1380,7 +1423,78 @@
         }
 
         DEBUG && parts.length && console.log(`[mrs] Score: ${score} for "${srcTitle}" (${source.year || '?'}) — ${parts.join(', ')}`);
-        return score;
+        // Top-1 of the query plus the exact same year is the one bridge that
+        // survives a title in a completely different language ("Zhmurki" →
+        // "Blind Man's Bluff", "Jagten" → "The Hunt"). It counts as evidence on
+        // its own, otherwise every RU→EN row would be refused as "no title text".
+        const suggestEv = titleKind === '' && candidate.suggestRank === 0 && yearExact;
+        return { score, titleKind, idExact, suggestEv, parts };
+    }
+
+    // Numeric API kept for callers that only need a threshold.
+    function scoreCandidate(source, candidate, extraTitles = []) {
+        return scoreCandidateDetail(source, candidate, extraTitles).score;
+    }
+
+    // Is the candidate's title really this film, or did it win on a shared
+    // substring? `exact` covers title / clean-title / alt / RU spellings and
+    // transliterations; `substring` is "Leon" inside "Leon: The Professional"
+    // and "The Matrix" inside "A Glitch in the Matrix". Substring evidence is
+    // only usable together with an agreeing year, never on its own.
+    function titleEvidenceOk(detail, source, candidate) {
+        if (!detail) return false;
+        if (detail.idExact) return true;
+        if (detail.titleKind === 'exact') return true;
+        if (detail.suggestEv) return true;
+        if (detail.titleKind !== 'substring') return false;
+        return !!source.year && !!candidate.year && yearsMatch(candidate.year, source.year);
+    }
+
+    // Final gate for the best candidate found by a search. A score alone must
+    // never be enough: +200 type and +250 fuzzy year can lift a subtitle-level
+    // guess over the "medium" line, and that is how "Saw" got rated instead of
+    // "Saw (2003 short)" or "The Raid" instead of "The Raid: Redemption".
+    // Prefix-level hits without an agreeing year survive only in Hard Import
+    // (`deep`), which is explicitly allowed to trade precision for coverage.
+    function bestAcceptable(best, source, deep) {
+        if (!best) return false;
+        // An identical external id is a stronger statement than a year: a
+        // re-release or a differing convention between platforms must not veto
+        // the one piece of evidence that literally names the same record.
+        if (best.idExact) return true;
+        if (!best.year || !source.year || yearsMatch(best.year, source.year)) {
+            // year agrees or is unknowable — decide on title evidence below
+        } else return false;
+        if (best.titleKind === 'exact') {
+            return best.confidence !== 'low' || best.score >= 350;
+        }
+        if (best.suggestEv) {
+            // Top suggestion of the exact query with the exact same year. This is
+            // the only honest bridge for a row whose title is in another language
+            // ("Jagten" → "The Hunt"); without it every RU→EN row stayed missing.
+            return !!(source.year && best.year && yearsMatch(best.year, source.year));
+        }
+        if (best.titleKind === 'substring') {
+            // A shared prefix only identifies the film when the year backs it up.
+            // In Hard Import the confidence bar is lower, never the year bar:
+            // the year is what distinguishes "Saw" from "Saw 2", not the score.
+            const yearAgrees = !!best.year && !!source.year && yearsMatch(best.year, source.year);
+            if (!yearAgrees) return false;
+            return best.confidence !== 'low' || (!!deep && best.score >= 350);
+        }
+        return false;
+    }
+
+    // A CSV row whose title is empty or a Letterboxd placeholder (`film:378945`)
+    // has nothing to search for: any candidate found by an empty query is a
+    // silent wrong match, which is worse than "not found".
+    function isSearchableTitle(title) {
+        const raw = String(title ?? '').trim();
+        if (!raw) return false;
+        if (/^(?:film|tv):\d+$/i.test(raw)) return false;
+        if (/^\d{5,}$/.test(raw)) return false;
+        // normTitle() strips articles, so "The" alone normalises to nothing.
+        return normTitle(raw).length >= 2;
     }
 
     // --- Confidence label based on total score ---
@@ -1909,6 +2023,7 @@
         return (!year || yearsMatch(mYear, year)) ? movie : null;
     }
 
+
     async function searchKPId(title, year, deep = false, allTitles = []) {
         const cacheKey = `kp:${normTitle(title)}|${year || ''}|${deep ? '1' : '0'}`;
         // Successful matches survive between runs: a re-import of the same CSV
@@ -1919,6 +2034,13 @@
         if (negTs && Date.now() - negTs < SEARCH_NEG_TTL) return null;
         return dedupeFetch(cacheKey, async () => {
             const nKey = normTitle(title);
+            // A row with no searchable title must never reach the endpoint: an
+            // empty keyword gives whatever the site feels like returning, and
+            // an arbitrary top hit is written as if it were the user's film.
+            if (!isSearchableTitle(title)) {
+                DEBUG && console.log(`[mrs] KP search skipped: unsearchable title "${String(title ?? '')}"`);
+                return null;
+            }
             const variants = deep ? getTitleVariants(title, allTitles) : getTitleVariants(title, allTitles).slice(0, 5);
             let best = null;
 
@@ -1941,26 +2063,33 @@
 
                 for (const m of candidates) {
                     if (!m?.id) continue;
-                    const hit = matchMovie(m, nKey, year);
-                    if (!hit) continue;
+                    // No substring pre-filter here: it used to reject the
+                    // candidate before scoring whenever the query and the KP
+                    // title were in different languages ("The Raid" vs
+                    // "Serbuan maut"), even with a bridging allTitles entry.
+                    // scoreCandidateDetail decides on the title pool instead.
                     const cand = {
-                        kpId: String(hit.id),
-                        titleRu: hit.title?.russian || '',
-                        titleOrig: hit.title?.original || '',
-                        year: String(hit.productionYear ?? hit.releaseYears?.start ?? hit.releaseYears?.end ?? ''),
-                        type: hit.__typename || 'Film',
+                        kpId: String(m.id),
+                        titleRu: m.title?.russian || '',
+                        titleOrig: m.title?.original || '',
+                        year: String(m.productionYear ?? m.releaseYears?.start ?? m.releaseYears?.end ?? ''),
+                        type: m.__typename || 'Film',
+                        alternative: (m.title?.alternative || []).map(a => a?.name).filter(Boolean),
+                        suggestRank: candidates.indexOf(m),
                     };
-                    const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
+                    const src = { title, titleRu: title, titleOrig: title, year, type: '', allTitles: [...allTitles, ...cand.alternative] };
+                    const detail = scoreCandidateDetail(src, cand);
+                    const score = detail.score;
                     const conf = confidenceLabel(score);
-                    if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                    if (conf === 'high' && titleEvidenceOk(detail, src, cand)) {
                         const result = { ...cand, score, confidence: conf };
                         searchCache.set(cacheKey, result);
                         DEBUG && console.log(`[mrs] KP search HIGH: "${title}" (${year}) → kpId=${cand.kpId} score=${score.toFixed(2)}`);
                         return result;
                     }
-                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf, titleKind: detail.titleKind, idExact: detail.idExact, suggestEv: detail.suggestEv };
                 }
-                if (best && best.confidence === 'high' && (!year || !best.year || yearsMatch(best.year, year))) {
+                if (bestAcceptable(best, { title, year }, deep)) {
                     searchCache.set(cacheKey, best);
                     return best;
                 }
@@ -2025,15 +2154,17 @@
                                 year: yr ? yr[0] : '',
                                 type: '',
                             };
-                            const score = scoreCandidate({ title, titleRu: title, titleOrig: title, year, type: '', allTitles }, cand);
+                            const src = { title, titleRu: title, titleOrig: title, year, type: '', allTitles };
+                            const detail = scoreCandidateDetail(src, cand);
+                            const score = detail.score;
                             const conf = confidenceLabel(score);
-                            if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                            if (conf === 'high' && titleEvidenceOk(detail, src, cand)) {
                                 const result = { ...cand, score, confidence: conf };
                                 searchCache.set(cacheKey, result);
                                 DEBUG && console.log(`[mrs] KP HTML HIGH: "${title}" (${year}) → kpId=${id} score=${score.toFixed(2)}`);
                                 return result;
                             }
-                            if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                            if (!best || score > best.score) best = { ...cand, score, confidence: conf, titleKind: detail.titleKind, idExact: detail.idExact, suggestEv: detail.suggestEv };
                         }
                     } catch (e) { console.warn("[mrs] catch:", e?.message ?? e); }
                 }
@@ -2041,11 +2172,7 @@
 
             if (best) {
                 DEBUG && console.log(`[mrs] KP search best: "${title}" (${year}) → kpId=${best.kpId} score=${best.score.toFixed(2)} conf=${best.confidence}`);
-                const yearOk = !best.year || !year || yearsMatch(best.year, year);
-                if (yearOk && (best.confidence === 'high'
-                    || (deep && best.confidence !== 'low')
-                    || (best.confidence === 'medium')
-                    || (best.confidence === 'low' && best.score >= 350))) {
+                if (bestAcceptable(best, { title, year }, deep)) {
                     searchCache.set(cacheKey, best);
                     return best;
                 }
@@ -2106,10 +2233,20 @@
             seen++;
             // Index every spelling we know: the profile page carries the Russian
             // title while a CSV row may carry the original one, and a key that is
-            // missing here silently costs a network search.
+            // missing here silently costs a network search. The year-less key is
+            // indexed too — rows exported without a year used to fall back to a
+            // key that was never stored, so the fallback could not hit at all.
+            // Cyrillic titles are also indexed transliterated, so a Letterboxd
+            // export ("Zhmurki") finds "Жмурки" without a search round-trip.
             for (const name of [item.titleRu, item.titleOrig, ...(item.allTitles || [])]) {
-                const k = titleKey(name, item.yearStart || item.year);
-                if (k && !byTitle.has(k)) byTitle.set(k, item.kpId);
+                const variants = [name];
+                if (hasCyr(name)) variants.push(translit(name));
+                for (const v of variants) {
+                    const k = titleKey(v, item.yearStart || item.year);
+                    if (k && !byTitle.has(k)) byTitle.set(k, item.kpId);
+                    const bare = titleKey(v);
+                    if (bare && !byTitle.has(bare)) byTitle.set(bare, item.kpId);
+                }
             }
         };
         const chExisting = channelWriter(el, 'kpExisting', t('lblExisting'));
@@ -2277,6 +2414,11 @@
             favReport();
             finishChannel(el, 'kpFavorites', true, true);
         }
+        // Resolutions found during this run are the expensive part of an
+        // import (one or two network searches per film). Only the LB path
+        // flushed the cache, so every repeat KP import paid for the same
+        // searches again — that is where the ~10 minutes for 915 rows went.
+        searchCache.flush();
         return { rated, watched, skipped, notFound, failed, missed, favorites: favCount };
     }
 
@@ -2297,10 +2439,11 @@
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry-kp',
                 className: 'mrs-btn mrs-btn--secondary',
-                textContent: t('deepSearchBtn', { count: result.missed.length }),
+                textContent: t('hardImportBtn', { count: result.missed.length }),
+                title: t('hardImportBtnHint'),
             });
             btn.addEventListener('click', async () => {
-                beginRun(statusEl, t('deepSearch', { platform: 'Kinopoisk' }));
+                beginRun(statusEl, t('hardImportRun', { platform: 'Kinopoisk' }));
                 const t0 = Date.now();
                 try {
                     const r2 = await runKPImportBatch(result.missed, statusEl, mode, true, getImportOptions());
@@ -2491,6 +2634,14 @@
 }`;
 
     async function imdbGql(query, variables) {
+        // Returns the parsed JSON body on success. On a transport failure
+        // (timeout, network error, CDN block, gateway 5xx) it returns
+        // `{ __transport: 'reason' }` instead of `{}`/`null`: the call site must
+        // be able to tell "the write was rejected" (a real failure, the rating
+        // stays missing) from "we never reached IMDb" (a retryable condition —
+        // the old code reported every CloudFront 403 as "API error / network
+        // failure" and dropped the rating).
+        let lastTransport = null;
         for (let i = 1; i <= RETRY.GQL; i++) {
             try {
                 const r = await fetchT(IMDB_GQL, 10000, {
@@ -2505,19 +2656,40 @@
                     credentials: 'include',
                     body: JSON.stringify({ query, variables }),
                 });
-                if (!r) { adjDelay(imdbGqlDelay, 'error'); continue; }
-                if (r.status === 429) {
+                if (!r) {
+                    lastTransport = 'network';
+                    adjDelay(imdbGqlDelay, 'error');
+                    if (i < RETRY.GQL) await sleep(imdbGqlDelay.val * 1.6);
+                    continue;
+                }
+                // 403/429/5xx from the gateway or its CDN are throttles, not
+                // rejections: the same request goes through after a pause.
+                if (r.status === 403 || r.status === 429 || r.status >= 500) {
+                    lastTransport = 'http' + r.status;
                     const ra = parseRetryAfter(r.responseHeaders);
-                    if (ra) { await sleep(ra); }
-                    else { adjDelay(imdbGqlDelay, '429'); await sleep(imdbGqlDelay.val * 1.5); }
-                    continue; }
-                const json = await r.json().catch(() => ({}));
-                adjDelay(imdbGqlDelay, json?.errors ? '429' : 'ok', 200);
+                    if (ra) await sleep(ra);
+                    else {
+                        adjDelay(imdbGqlDelay, r.status === 429 ? '429' : 'error');
+                        await sleep(300 + Math.random() * 400 + i * 300);
+                    }
+                    continue;
+                }
+                const json = await r.json().catch(() => null);
+                if (!json) {
+                    lastTransport = 'body';
+                    adjDelay(imdbGqlDelay, 'error');
+                    if (i < RETRY.GQL) await sleep(imdbGqlDelay.val * 1.6);
+                    continue;
+                }
+                adjDelay(imdbGqlDelay, json?.errors && !json?.data ? '429' : 'ok', 200);
                 return json;
-            } catch { adjDelay(imdbGqlDelay, 'error'); }
+            } catch (e) {
+                lastTransport = 'exception';
+                adjDelay(imdbGqlDelay, 'error');
+            }
             if (i < RETRY.GQL) await sleep(imdbGqlDelay.val * 1.6);
         }
-        return null;
+        return lastTransport ? { __transport: lastTransport } : null;
     }
 
     let __imdbFavouritesListId = null;
@@ -2644,9 +2816,12 @@
         let status = null;
         if (hasR) {
             const j = await imdbGql(GQL_RATE, { titleId: ttId, rating: +rating });
+            if (j?.__transport) return 'transport';
             if (j?.data?.rateTitle?.rating?.value) { rated.add(ttId); watched.add(ttId); status = 'rated'; }
+            else if (j?.errors) DEBUG && console.log(`[mrs] IMDb rate rejected ${ttId}:`, JSON.stringify(j.errors).slice(0, 200));
         } else {
             const j = await imdbGql(GQL_WATCH, { titleId: ttId });
+            if (j?.__transport) return 'transport';
             if (j?.data?.addWatchedTitle?.success) { watched.add(ttId); status = 'watched'; }
         }
         return status;
@@ -2872,7 +3047,11 @@
                     if (jsonText.endsWith(';')) jsonText = jsonText.slice(0, -1);
                     if (!jsonText.startsWith('{')) return [];
                     const data = JSON.parse(jsonText);
-                    return (data.d || []).map((item, idx) => {
+                    // Rank counts *films* in the answer, not raw entries: the
+                    // list also carries people and companies, and the old index
+                    // made the first real film look like rank 1. That silently
+                    // disabled the "top suggestion + exact year" bridge.
+                    const films = (data.d || []).map(item => {
                         if (!item.id?.startsWith('tt')) return null;
                         return {
                             ttId: item.id,
@@ -2880,9 +3059,10 @@
                             titleOrig: item.l || '',
                             year: String(item.y || ''),
                             type: item.qid || item.q || '',
-                            suggestRank: idx,
                         };
                     }).filter(Boolean);
+                    films.forEach((f, i) => { f.suggestRank = i; });
+                    return films;
                 } catch (e) {
                     if (attempt < 2) { await sleep(300 + attempt * 400); continue; }
                     console.warn('[mrs] IMDb suggest error:', e.message);
@@ -2906,6 +3086,12 @@
         const negTs = _imdbNeg.get(cacheKey);
         if (negTs && Date.now() - negTs < IMDB_NEG_TTL) return null;
         return dedupeFetch(cacheKey, async () => {
+            // Nothing to search for: writing the top hit of an empty query is
+            // exactly how rows get rated as the wrong film.
+            if (!isSearchableTitle(title)) {
+                DEBUG && console.log(`[mrs] IMDb search skipped: unsearchable title "${String(title ?? '')}"`);
+                return null;
+            }
             // --- Phase 1: Suggest API (fast JSON, ~200ms) ---
             // Try the primary title first, then transliteration (for Cyrillic) and
             // non-Cyrillic alt titles (e.g. "Your Name" for "Твоё имя").
@@ -2932,18 +3118,18 @@
             }
             // Rank per suggestion query (0 = top result). Only trust top-1 + year when title is unrelated.
             let best = null;
+            const srcObj = { title, titleOrig: title, year, type: src.type || '', genres: src.genres || '', allTitles };
             for (const cand of suggestCandidates) {
-                const score = scoreCandidate({ title, titleOrig: title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                const detail = scoreCandidateDetail(srcObj, cand);
+                const score = detail.score;
                 const conf = confidenceLabel(score);
-                if (conf === 'high') {
+                if (conf === 'high' && titleEvidenceOk(detail, srcObj, cand)) {
                     DEBUG && console.log(`[mrs] IMDb suggest HIGH: "${title}" (${year}) → ${cand.ttId} score=${score.toFixed(2)}`);
-                    if (!year || !cand.year || yearsMatch(cand.year, year)) {
-                        const result = { ...cand, score, confidence: conf };
-                        searchCache.set(cacheKey, result);
-                        return result;
-                    }
+                    const result = { ...cand, score, confidence: conf };
+                    searchCache.set(cacheKey, result);
+                    return result;
                 }
-                if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                if (!best || score > best.score) best = { ...cand, score, confidence: conf, titleKind: detail.titleKind, idExact: detail.idExact, suggestEv: detail.suggestEv };
             }
 
             // --- Phase 2: HTML fallback ---
@@ -3013,25 +3199,23 @@
                             type: '',
                         };
                     }
-                    const score = scoreCandidate({ title, titleOrig: title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                    const detail = scoreCandidateDetail(srcObj, cand);
+                    const score = detail.score;
                     const conf = confidenceLabel(score);
-                    if (conf === 'high') {
+                    if (conf === 'high' && titleEvidenceOk(detail, srcObj, cand)) {
                         DEBUG && console.log(`[mrs] IMDb fallback HIGH: "${title}" (${year}) → ${id} score=${score.toFixed(2)}`);
-                        if (!year || !cand.year || yearsMatch(cand.year, year)) {
-                            const result = { ...cand, score, confidence: conf };
-                            searchCache.set(cacheKey, result);
-                            return result;
-                        }
+                        const result = { ...cand, score, confidence: conf };
+                        searchCache.set(cacheKey, result);
+                        return result;
                     }
-                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf, titleKind: detail.titleKind, idExact: detail.idExact, suggestEv: detail.suggestEv };
                 }
-                if (best?.confidence === 'high' && (!year || !best.year || yearsMatch(best.year, year))) break;
+                if (best?.confidence === 'high' && titleEvidenceOk({ titleKind: best.titleKind }, srcObj, best)) break;
             }
 
             if (best) {
                 DEBUG && console.log(`[mrs] IMDb fallback best: "${title}" (${year}) → ${best.ttId} score=${best.score.toFixed(2)} conf=${best.confidence}`);
-                const yearOk = !best.year || !year || yearsMatch(best.year, year);
-                if (yearOk && (deep ? best.confidence !== 'low' || best.score >= 350 : (best.confidence === 'high' || best.confidence === 'medium' || (best.confidence === 'low' && best.score >= 350)))) {
+                if (bestAcceptable(best, { title, year }, deep)) {
                     searchCache.set(cacheKey, best);
                     return best;
                 }
@@ -3081,26 +3265,44 @@
 
         let cur = 0;
         const chApply = channelWriter(statusEl, 'imdbApply', t('lblApply'));
+        // A write that never reached IMDb (timeout, CDN 403, 5xx) is retried
+        // once after the rest of the queue: the gateway recovers, and the old
+        // code counted it as "API error / network failure" and dropped a rating
+        // that a single retry would have written.
+        let retryQueue = [];
+        const applySlice = async (slice, isRetry) => {
+            const res = await asyncPool(gqlProbe.c, slice, ({ item, ttId }) => applyIMDb(ttId, item.rating, rated, watched));
+            let fail = 0, transport = 0;
+            res.forEach((x, j) => {
+                const s = x.status === 'fulfilled' ? x.value : null;
+                if (s === 'rated') r++;
+                else if (s === 'watched') w++;
+                else if (s === 'transport' && !isRetry) { transport++; retryQueue.push(slice[j]); }
+                else { fa++; missed.push({ ...slice[j].item, error: t('errorApi') }); fail++; }
+            });
+            return { fail: fail + transport };
+        };
         while (cur < toApply.length) {
             const slice = toApply.slice(cur, cur + gqlProbe.c);
             const to = Math.min(cur + gqlProbe.c, toApply.length);
             chApply(`${cur + 1}–${to}/${toApply.length}`, { current: to, total: toApply.length });
             const t0 = Date.now();
-            const res = await asyncPool(gqlProbe.c, slice, ({ item, ttId }) => applyIMDb(ttId, item.rating, rated, watched));
-            let fail = 0;
-            res.forEach((x, j) => {
-                const s = x.status === 'fulfilled' ? x.value : null;
-                const item = slice[j].item;
-                if (s === 'rated') r++;
-                else if (s === 'watched') w++;
-                else { fa++; missed.push({ ...item, error: t('errorApi') }); fail++; }
-            });
+            const { fail } = await applySlice(slice, false);
             cur = to; // slice length, not the post-probe value: see kpApply
             const elapsed = Date.now() - t0;
             // Only a mostly-failing batch means the endpoint is overloaded; a
             // single rejected write must not cut concurrency for the rest of the run.
             fail / slice.length >= 0.5 ? probeFail(gqlProbe) : probeOk(gqlProbe, elapsed);
             // No artificial sleep — asyncPool naturally paces requests
+        }
+        if (retryQueue.length) {
+            // Give the gateway a moment to come back, then a single quieter pass.
+            chApply(`${t('lblApply')} ↻ ${retryQueue.length}`, { extra: `↻ ${retryQueue.length}` });
+            await sleep(1500 + Math.random() * 1000);
+            const pending = retryQueue;
+            retryQueue = [];
+            Object.assign(gqlProbe, makeProbe(8, PLATFORM_MAX.imdb));
+            await applySlice(pending, true);
         }
         if (toApply.length) chApply(`${toApply.length}/${toApply.length}`, { current: toApply.length, total: toApply.length });
         finishChannel(statusEl, 'imdbApply', fa === 0, true);
@@ -3227,10 +3429,11 @@
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry',
                 className: 'mrs-btn mrs-btn--secondary',
-                textContent: t('deepSearchBtn', { count: result.missed.length }),
+                textContent: t('hardImportBtn', { count: result.missed.length }),
+                title: t('hardImportBtnHint'),
             });
             btn.addEventListener('click', async () => {
-                beginRun(statusEl, t('deepSearch', { platform: 'IMDb' }));
+                beginRun(statusEl, t('hardImportRun', { platform: 'IMDb' }));
                 const t0 = Date.now();
                 try {
                     const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode, getImportOptions());
@@ -4181,6 +4384,10 @@
         const negTs = _lbNeg.get(cacheKey);
         if (negTs && Date.now() - negTs < SEARCH_NEG_TTL) return null;
         return dedupeFetch(cacheKey, async () => {
+            if (!isSearchableTitle(title)) {
+                DEBUG && console.log(`[mrs] LB search skipped: unsearchable title "${String(title ?? '')}"`);
+                return null;
+            }
             const variants = deep ? getTitleVariants(title, allTitles) : getTitleVariants(title, allTitles).slice(0, 5);
             const ts = Date.now();
             let best = null;
@@ -4227,24 +4434,26 @@
 
             // In normal mode three spellings are plenty (the title, its cleaned
             // form and the transliteration); deep mode may use the whole list.
+            const srcObj = { title, year, type: src.type || '', genres: src.genres || '', allTitles };
             const maxAuto = deep ? variants.length : Math.min(variants.length, 3);
             for (const q of variants.slice(0, maxAuto)) {
                 const items = await tryAutocomplete(q);
                 for (const cand of items) {
-                    const score = scoreCandidate({ title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                    const detail = scoreCandidateDetail(srcObj, cand);
+                    const score = detail.score;
                     const conf = confidenceLabel(score);
-                    if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                    if (conf === 'high' && titleEvidenceOk(detail, srcObj, cand)) {
                         const result = { ...cand, score, confidence: conf };
                         searchCache.set(cacheKey, result);
                         DEBUG && console.log(`[mrs] LB autocomplete HIGH: "${title}" (${year}) → ${cand.slug} score=${score.toFixed(2)}`);
                         return result;
                     }
-                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf, titleKind: detail.titleKind, idExact: detail.idExact, suggestEv: detail.suggestEv };
                 }
                 // A confident hit on the primary spelling is enough: every
                 // extra variant costs two autocomplete requests *and* possibly
                 // two HTML search pages.
-                if (best && best.confidence === 'high' && (!year || !best.year || yearsMatch(best.year, year))) {
+                if (best && best.confidence === 'high' && titleEvidenceOk({ titleKind: best.titleKind }, srcObj, best)) {
                     searchCache.set(cacheKey, best);
                     return best;
                 }
@@ -4253,7 +4462,7 @@
             // it already produced a usable medium/low match: the HTML search
             // below is two full page fetches per spelling and is the single
             // slowest step of a large Letterboxd import.
-            if (!deep && best && best.confidence !== 'low') {
+            if (!deep && best && best.confidence !== 'low' && best.titleKind !== 'substring') {
                 searchCache.set(cacheKey, best);
                 return best;
             }
@@ -4299,25 +4508,22 @@
                     if (lbHtmlBreaker.fail()) console.warn('[mrs] LB HTML search disabled for this run after repeated empty answers');
                 } else lbHtmlBreaker.ok();
                 for (const cand of items) {
-                    const score = scoreCandidate({ title, year, type: src.type || '', genres: src.genres || '', allTitles }, cand);
+                    const detail = scoreCandidateDetail(srcObj, cand);
+                    const score = detail.score;
                     const conf = confidenceLabel(score);
-                    if (conf === 'high' && (!year || !cand.year || yearsMatch(cand.year, year))) {
+                    if (conf === 'high' && titleEvidenceOk(detail, srcObj, cand)) {
                         const result = { ...cand, score, confidence: conf };
                         searchCache.set(cacheKey, result);
                         DEBUG && console.log(`[mrs] LB HTML HIGH: "${title}" (${year}) → ${cand.slug} score=${score.toFixed(2)}`);
                         return result;
                     }
-                    if (!best || score > best.score) best = { ...cand, score, confidence: conf };
+                    if (!best || score > best.score) best = { ...cand, score, confidence: conf, titleKind: detail.titleKind, idExact: detail.idExact, suggestEv: detail.suggestEv };
                 }
             }
 
             if (best) {
                 DEBUG && console.log(`[mrs] LB best: "${title}" (${year}) → ${best.slug} score=${best.score.toFixed(2)} conf=${best.confidence}`);
-                const yearOk = !best.year || !year || yearsMatch(best.year, year);
-                if (yearOk && (best.confidence === 'high'
-                    || (deep && best.confidence !== 'low')
-                    || best.confidence === 'medium'
-                    || (best.confidence === 'low' && best.score >= 350))) {
+                if (bestAcceptable(best, { title, year }, deep)) {
                     searchCache.set(cacheKey, best);
                     return best;
                 }
@@ -4650,9 +4856,13 @@
             if (!map.has(item.slug)) { map.set(item.slug, rating); seen++; }
             // Index every known spelling so a title that differs from the page
             // title still hits the fast path instead of falling through to search.
+            // Year-less keys are stored as well: a CSV row without a year falls
+            // back to them, and the old index never had such an entry.
             for (const name of [item.title, item.titleRu, item.titleOrig, ...(item.allTitles || [])]) {
                 const k = titleKey(name, item.year);
                 if (k && !byTitle.has(k)) byTitle.set(k, item.slug);
+                const bare = titleKey(name);
+                if (bare && !byTitle.has(bare)) byTitle.set(bare, item.slug);
             }
         };
         const write = (channel, label) => {
@@ -4896,10 +5106,11 @@
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry-lb',
                 className: 'mrs-btn mrs-btn--secondary',
-                textContent: t('deepSearchBtn', { count: result.missed.length }),
+                textContent: t('hardImportBtn', { count: result.missed.length }),
+                title: t('hardImportBtnHint'),
             });
             btn.addEventListener('click', async () => {
-                beginRun(statusEl, t('deepSearch', { platform: 'Letterboxd' }));
+                beginRun(statusEl, t('hardImportRun', { platform: 'Letterboxd' }));
                 const t0 = Date.now();
                 try { await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions(), result.sourcePlatform); }
                 catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
@@ -5095,7 +5306,7 @@
             });
 
             const btnImport = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--secondary', textContent: t('importRatings'), title: t('importHint') });
-            const btnReplace = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--danger', textContent: t('hardImport'), title: t('hardImportHint') });
+            const btnReplace = Object.assign(document.createElement('button'), { className: 'mrs-btn mrs-btn--danger', textContent: t('replaceAll'), title: t('replaceAllHint') });
 
             btnImport.addEventListener('click', () => { mode = 'normal'; fileInput.click(); });
             btnReplace.addEventListener('click', () => { mode = 'replace'; fileInput.click(); });

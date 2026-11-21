@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-let LIMIT = 0, FILTER = '', TRACE = false;
+let LIMIT = 0, FILTER = '', TRACE = false, DEEP = false;
 const positional = [];
 {
     const args = process.argv.slice(2);
@@ -14,6 +14,7 @@ const positional = [];
         if (args[i] === '--limit') LIMIT = parseInt(args[++i], 10) || 0;
         else if (args[i] === '--filter') FILTER = String(args[++i] || '').toLowerCase();
         else if (args[i] === '--trace') TRACE = true;
+        else if (args[i] === '--deep') DEEP = true;
         else positional.push(args[i]);
     }
 }
@@ -241,7 +242,7 @@ async function main() {
         checked++;
         let result = null;
         try {
-            result = await internals.resolveIMDb(query, year, false, allTitles, { type: (r.type || '').trim(), genres: (r.genres || '').trim() });
+            result = await internals.resolveIMDb(query, year, DEEP, allTitles, { type: (r.type || '').trim(), genres: (r.genres || '').trim() });
         } catch (e) {
             notFound++;
             notFoundList.push({ title: query, year, err: e.message });
