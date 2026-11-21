@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.6
+// @version      1.7
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -670,6 +670,36 @@
     }
 
     // ====================== CSV ======================
+
+    // Every platform is called one short name, and an import always runs on the
+    // site the file is imported INTO, so those are the two ends of a direction.
+    const PLATFORM_SHORT = { kp: 'kp', imdb: 'imdb', lb: 'lb' };
+    const PLATFORM_NAME = { kp: 'Kinopoisk', imdb: 'IMDb', lb: 'Letterboxd' };
+
+    // Which platform a CSV came from, decided by the columns it carries:
+    // KpId → Kinopoisk, TtId → IMDb, LbSlug → Letterboxd. Exports always carry
+    // the source id; `src` on a row is a fallback.
+    function detectCsvSource(csvData) {
+        const header = String(csvData ?? '').split(/\r?\n/, 1)[0].replace(/^\uFEFF/, '');
+        const cols = header.split(',').map(c => c.trim().toLowerCase());
+        if (cols.includes('kpid')) return 'kp';
+        if (cols.includes('ttid')) return 'imdb';
+        if (cols.includes('lbslug')) return 'lb';
+        return null;
+    }
+
+    // "Kinopoisk → IMDb": the two ends of the run, shown in the result title.
+    const PLATFORM_DIRECTION = (from, to) => `${PLATFORM_NAME[from] ?? '-'} → ${PLATFORM_NAME[to]}`;
+
+    // `imdb_to_letterboxd_missed_700_2026-11-21.csv` instead of `lb_missed.csv`:
+    // the file name says where the data came from and which site refused it.
+    function missedFileName(from, to, count, tag = 'missed') {
+        const dir = PLATFORM_SHORT[from] && PLATFORM_SHORT[to]
+            ? `${PLATFORM_SHORT[from]}_to_${PLATFORM_SHORT[to]}`
+            : PLATFORM_SHORT[to] ? `to_${PLATFORM_SHORT[to]}` : 'unknown';
+        const date = new Date().toISOString().slice(0, 10);
+        return `${dir}_${tag}_${count}_${date}.csv`;
+    }
 
     const csvEsc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
     const TITLE_DELIM = ' | ';
@@ -2203,6 +2233,7 @@
 
     function renderKPResult(result, statusEl, mode) {
         const lbl = mode === 'replace' ? t('replaceMode') : '';
+        const from = result.sourcePlatform ?? null;
         const kpPairs = [
             [t('rated'), result.rated],
             [t('watchedShort'), result.watched],
@@ -2211,9 +2242,9 @@
             [t('failed'), result.failed],
         ];
         if (result.favorites != null) kpPairs.push([t('favorites'), result.favorites]);
-        renderResult(statusEl, t('done', { mode: lbl }), kpPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
+        renderResult(statusEl, '✅ ' + PLATFORM_DIRECTION(from, 'kp') + lbl, kpPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
         if (result.missed.length) {
-            downloadCSV(buildCSV(result.missed), 'kp_missed.csv');
+            downloadCSV(buildCSV(result.missed), missedFileName(from, 'kp', result.missed.length));
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry-kp',
                 className: 'mrs-btn mrs-btn--secondary',
@@ -2225,6 +2256,7 @@
                 try {
                     const r2 = await runKPImportBatch(result.missed, statusEl, mode, true, getImportOptions());
                     r2.elapsedMs = Date.now() - t0;
+                    r2.sourcePlatform = result.sourcePlatform;
                     renderKPResult(r2, statusEl, mode);
                 } catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
             });
@@ -2238,7 +2270,10 @@
     async function performKPImport(csvData, statusEl, mode, deep = false, opts = {}) {
         const items = parseCSV(csvData);
         if (!items.length) return setStatus(statusEl, t('csvEmpty'));
-        beginRun(statusEl, `${items.length} ${t('movies')}`);
+        // Which platform this CSV came from, so the summary and the retry file
+        // name state the full direction instead of only the target.
+        const from = detectCsvSource(csvData);
+        beginRun(statusEl, PLATFORM_DIRECTION(from, 'kp'));
         const started = Date.now();
         // `deep` must reach the batch: it decides whether the existing profile is
         // loaded for skipping and how many spellings the search may try. It used
@@ -2246,6 +2281,7 @@
         // ran as a normal import and skipped everything it was meant to find.
         const result = await runKPImportBatch(items, statusEl, mode, deep, opts);
         result.elapsedMs = Date.now() - started;
+        result.sourcePlatform = from;
         renderKPResult(result, statusEl, mode);
     }
 
@@ -3127,6 +3163,7 @@
 
     function renderIMDbResult(result, statusEl, rated, watched, mode) {
         const lbl = mode === 'replace' ? t('replaceMode') : '';
+        const from = result.sourcePlatform ?? null;
         const imdbPairs = [
             [t('rated'), result.rated],
             [t('watched'), result.watched],
@@ -3135,9 +3172,9 @@
             [t('failed'), result.failed],
         ];
         if (result.favorites != null) imdbPairs.push([t('favorites'), result.favorites]);
-        renderResult(statusEl, t('done', { mode: lbl }), imdbPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
+        renderResult(statusEl, '✅ ' + PLATFORM_DIRECTION(from, 'imdb') + lbl, imdbPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
         if (result.missed.length) {
-            downloadCSV(buildCSV(result.missed), 'imdb_missed.csv');
+            downloadCSV(buildCSV(result.missed), missedFileName(from, 'imdb', result.missed.length));
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry',
                 className: 'mrs-btn mrs-btn--secondary',
@@ -3149,6 +3186,7 @@
                 try {
                     const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode, getImportOptions());
                     r2.elapsedMs = Date.now() - t0;
+                    r2.sourcePlatform = result.sourcePlatform;
                     renderIMDbResult(r2, statusEl, rated, watched, mode);
                 } catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
             });
@@ -3334,7 +3372,8 @@
         const uid = getIMDbUid();
         if (!uid) return setStatus(statusEl, t('imdbUserIdNotFound'));
 
-        beginRun(statusEl, `${items.length} ${t('movies')}`);
+        const from = detectCsvSource(csvData);
+        beginRun(statusEl, PLATFORM_DIRECTION(from, 'imdb'));
         // Skip history scan if importing items without IMDb IDs (e.g. from Letterboxd)
         let rated, watched;
         ({ rated, watched } = await getIMDbHistory(statusEl));
@@ -3344,6 +3383,7 @@
         const t0 = Date.now();
         const result = await imdbProcess(items, rated, watched, statusEl, shouldDeep, mode, opts);
         result.elapsedMs = Date.now() - t0;
+        result.sourcePlatform = from;
         renderIMDbResult(result, statusEl, rated, watched, mode);
     }
 
@@ -4589,7 +4629,7 @@
         return map;
     }
 
-    async function performLBImport(csvData, statusEl, mode, deep = false, opts = {}) {
+    async function performLBImport(csvData, statusEl, mode, deep = false, opts = {}, sourcePlatform = null) {
         const t0 = Date.now();
         const items = parseCSV(csvData);
         if (!items.length) return setStatus(statusEl, t('csvEmpty'));
@@ -4597,9 +4637,10 @@
         const csrfRef = { val: getLBCsrf() };
         if (!csrfRef.val) return setStatus(statusEl, t('csrfNotFound'));
 
+        const from = sourcePlatform && PLATFORM_SHORT[sourcePlatform] ? sourcePlatform : detectCsvSource(csvData);
         // Phase 1: resolve slugs
         Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
-        beginRun(statusEl, `${items.length} ${t('movies')}`);
+        beginRun(statusEl, PLATFORM_DIRECTION(from, 'lb'));
         // Load the existing profile FIRST: 773 of 899 films in a re-import are
         // already rated, and resolving them by search was the bulk of the time.
         const existing = mode === 'normal' && !deep ? await lbFetchRatings(statusEl) : new Map();
@@ -4786,11 +4827,12 @@
 
         DEBUG && console.log(`[mrs] LB APPLY DONE: rated=${rated} watched=${watched} favorites=${favorites} failed=${failed} toApply=${toApply.length}`);
         searchCache.flush();
-        renderLBResult({ rated, watched, skipped, notFound, failed, missed, favorites, elapsedMs: Date.now() - t0 }, statusEl, mode);
+        renderLBResult({ rated, watched, skipped, notFound, failed, missed, favorites, elapsedMs: Date.now() - t0, sourcePlatform: from }, statusEl, mode);
     }
 
     function renderLBResult(result, statusEl, mode) {
         const lbl = mode === 'replace' ? t('replaceMode') : '';
+        const from = result.sourcePlatform ?? null;
         const lbPairs = [
             [t('rated'), result.rated],
             [t('watchedShort'), result.watched],
@@ -4799,9 +4841,9 @@
             [t('failed'), result.failed],
         ];
         if (result.favorites != null) lbPairs.push([t('favorites'), result.favorites]);
-        renderResult(statusEl, t('done', { mode: lbl }), lbPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
+        renderResult(statusEl, '✅ ' + PLATFORM_DIRECTION(from, 'lb') + lbl, lbPairs, result.notFound === 0 && result.failed === 0 ? t('allImported') : null, result.elapsedMs);
         if (result.missed.length) {
-            downloadCSV(buildCSV(result.missed), 'lb_missed.csv');
+            downloadCSV(buildCSV(result.missed), missedFileName(from, 'lb', result.missed.length));
             const btn = Object.assign(document.createElement('button'), {
                 id: 'mrs-retry-lb',
                 className: 'mrs-btn mrs-btn--secondary',
@@ -4810,7 +4852,7 @@
             btn.addEventListener('click', async () => {
                 beginRun(statusEl, t('deepSearch', { platform: 'Letterboxd' }));
                 const t0 = Date.now();
-                try { await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions()); }
+                try { await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions(), result.sourcePlatform); }
                 catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
             });
             const btnWrap = document.createElement('div');

@@ -41,7 +41,7 @@ check('KP deep-search retry reports errors',
 check('IMDb deep-search retry reports errors',
   /imdbProcess\(result\.missed, rated, watched, statusEl, true, mode, getImportOptions\(\)\)[\s\S]{0,400}catch \(err\) \{ reportRunError/.test(src));
 check('LB deep-search retry reports errors',
-  /performLBImport\(buildCSV\(result\.missed\), statusEl, mode, true, getImportOptions\(\)\)[\s\S]{0,400}catch \(err\) \{ reportRunError/.test(src));
+  /performLBImport\(buildCSV\(result\.missed\), statusEl, mode, true, getImportOptions\(\), result\.sourcePlatform\)[\s\S]{0,200}catch \(err\) \{ reportRunError/.test(src));
 
 // 4. No handler should fall back to the old bare-message path.
 check('no bare ❌ result renderer remains',
