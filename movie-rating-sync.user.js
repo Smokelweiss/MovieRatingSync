@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.4
+// @version      1.5
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -3150,6 +3150,11 @@
         const scan = async (urlFn, label, channel) => {
             const write = channelWriter(el, channel, label);
             const items = [];
+            // `p` is declared by the loop header, so it does NOT exist after the
+            // loop closes. Reading it here threw "ReferenceError: p is not
+            // defined" and killed the export right after "Detecting IMDb profile".
+            // Track the last page that actually answered instead.
+            let lastPage = 0;
             for (let p = 1; p <= RETRY.PAGES; p++) {
                 write(`${t('page')} ${p}`, { extra: `${items.length} ${t('movies')}` });
                 const nd = await fetchNextData(urlFn(uid, p));
@@ -3157,6 +3162,7 @@
                 const s = nd?.props?.pageProps?.mainColumnData?.advancedTitleSearch;
                 const edges = s?.edges ?? [];
                 if (!edges.length) break;
+                lastPage = p;
                 for (const e of edges) {
                     const n = e?.node?.title ?? e?.node;
                     if (!n?.id?.startsWith('tt') || seen.has(n.id)) continue;
@@ -3175,7 +3181,7 @@
                 if (!s?.pageInfo?.hasNextPage) break;
                 await sleep(DELAY.HISTORY_PAGE);
             }
-            write(`${t('page')} ${Math.max(1, p - 1)}`, { extra: `${items.length} ${t('movies')}` });
+            write(`${t('page')} ${Math.max(1, lastPage)}`, { extra: `${items.length} ${t('movies')}` });
             finishChannel(el, channel, items.length > 0, true);
             return items;
         };

@@ -68,7 +68,8 @@ for (const w of workers) {
     }
 }
 check('no worker named p', !new RegExp('async\\s*\\(\\s*p\\s*\\)\\s*=>').test(src));
-check('IMDb export scan declares its own page counter', /scan = async \(urlFn, label, channel\) => \{\s*\n\s*const write = channelWriter\(el, channel, label\);\s*\n\s*const items = \[\];\s*\n\s*for \(let p = 1;/.test(src));
+check('IMDb export scan tracks the page it reached without reading `p` after the loop',
+    /let lastPage = 0;/.test(src) && /Math\.max\(1, lastPage\)/.test(src));
 
 console.log('\n' + (ok ? 'NAME RESOLUTION ALL OK' : 'FAILURES ABOVE'));
 process.exit(ok ? 0 : 1);
