@@ -650,9 +650,9 @@
     function renderError(el, err, elapsedMs) {
         if (!el) return;
         const message = err && err.message != null ? String(err.message) : String(err);
+        ensureStatusShell(el);
         const channel = el.__lastChannel;
         if (channel) finishChannel(el, channel, false);
-        ensureStatusShell(el);
         setTitle(el, '❌ ' + message);
         // Stop the clock: this card is final, not a run in progress.
         if (el.__timerInterval) { clearInterval(el.__timerInterval); el.__timerInterval = null; }
@@ -3194,7 +3194,6 @@
             // Track the last page that actually answered instead.
             let lastPage = 0;
             for (let p = 1; p <= RETRY.PAGES; p++) {
-                lastPage = p;
                 write(`${t('page')} ${p}`, { extra: `${items.length} ${t('movies')}` });
                 const nd = await fetchNextData(urlFn(uid, p));
                 if (!nd) break;
