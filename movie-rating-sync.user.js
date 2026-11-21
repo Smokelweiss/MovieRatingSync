@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.9
+// @version      1.10
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -884,16 +884,24 @@
             header.forEach((h, idx) => row[h] = cells[idx] ?? '');
             const unq = s => (s || '').replace(/""/g, '"');
             const titleRu = decodeHtmlEntities(unq(row.titleru));
-            const titleOrig = decodeHtmlEntities(unq(row.titleorig));
+            const titleOrigRaw = decodeHtmlEntities(unq(row.titleorig));
             const cleanRu = cleanTitle(titleRu);
-            const cleanOrig = cleanTitle(titleOrig);
+            let cleanOrig = cleanTitle(titleOrigRaw);
+            // Letterboxd knows some films only as `film:378945`. Such an
+            // identifier must not shadow a real name in the other column —
+            // rows of the last test were skipped although their Russian title
+            // was perfectly searchable, and every scorer read the placeholder
+            // as the primary name.
+            const placeholder = s => !s || /^(?:film|tv):\d+$/i.test(s) || /^\d{5,}$/.test(s);
+            if (placeholder(cleanOrig)) cleanOrig = '';
+            const title = cleanOrig || cleanRu;
             const rawAllTitles = decodeHtmlEntities(unq(row.alltitles));
             const allTitles = splitAllTitles(rawAllTitles);
             const rawRating = (row.rating10 === 'w' || row.rating10 === '') ? null : +row.rating10;
             result.push({
                 titleRu: cleanRu || titleRu,
-                titleOrig: cleanOrig || titleOrig,
-                title: cleanOrig || cleanRu || titleOrig || titleRu,
+                titleOrig: cleanOrig,
+                title: title || cleanRu || cleanOrig || titleRu || titleOrigRaw,
                 allTitles,
                 type: (row.type || '').trim(),
                 kpId: (row.kpid || '').trim(),
@@ -1423,11 +1431,15 @@
         }
 
         DEBUG && parts.length && console.log(`[mrs] Score: ${score} for "${srcTitle}" (${source.year || '?'}) — ${parts.join(', ')}`);
-        // Top-1 of the query plus the exact same year is the one bridge that
+        // Top-1 of the query plus the same year is the one bridge that
         // survives a title in a completely different language ("Zhmurki" →
         // "Blind Man's Bluff", "Jagten" → "The Hunt"). It counts as evidence on
         // its own, otherwise every RU→EN row would be refused as "no title text".
-        const suggestEv = titleKind === '' && candidate.suggestRank === 0 && yearExact;
+        // A one-year difference is allowed: platforms disagree on the premiere
+        // year often enough ("Легенда №17" is 2012 in an export and 2013 on IMDb)
+        // and the top hit of the exact query is still the same film.
+        const suggestEv = titleKind === '' && candidate.suggestRank === 0
+            && !!source.year && !!candidate.year && yearsMatch(candidate.year, source.year);
         return { score, titleKind, idExact, suggestEv, parts };
     }
 
@@ -3245,7 +3257,15 @@
     }
 
     async function imdbApplyPhase(resolved, rated, watched, statusEl, mode, total, opts = {}) {
-        Object.assign(gqlProbe, makeProbe(20, PLATFORM_MAX.imdb));
+        // Writes are NOT page reads. PLATFORM_MAX.imdb (200) is sized for
+        // listing/search GETs, but the rateTitle/addWatchedTitle mutations come
+        // out of the same GraphQL gateway and start answering 403/429 long
+        // before that. The last real exports show the cost: 45 of 68
+        // Kinopoisk→IMDb and 39 of 66 Letterboxd→IMDb rows landed in
+        // "API error / network failure" — every one of them already resolved.
+        // A rating mutation takes ~50 ms, so 12 in flight still clears ~240/s
+        // while staying under the gateway's tolerance.
+        Object.assign(gqlProbe, makeProbe(12, 20));
         imdbGqlDelay.val = DELAY.GQL_INIT;
         let r = 0, w = 0, fav = 0, sk = 0, nf = 0, fa = 0;
         const missed = [];
@@ -3277,7 +3297,10 @@
                 const s = x.status === 'fulfilled' ? x.value : null;
                 if (s === 'rated') r++;
                 else if (s === 'watched') w++;
-                else if (s === 'transport' && !isRetry) { transport++; retryQueue.push(slice[j]); }
+                // A write that never reached IMDb is queued again on every
+                // pass; the caller stops passing after the last one and turns
+                // whatever is left into a reported failure.
+                else if (s === 'transport') { transport++; retryQueue.push(slice[j]); }
                 else { fa++; missed.push({ ...slice[j].item, error: t('errorApi') }); fail++; }
             });
             return { fail: fail + transport };
@@ -3296,13 +3319,33 @@
             // No artificial sleep — asyncPool naturally paces requests
         }
         if (retryQueue.length) {
-            // Give the gateway a moment to come back, then a single quieter pass.
-            chApply(`${t('lblApply')} ↻ ${retryQueue.length}`, { extra: `↻ ${retryQueue.length}` });
-            await sleep(1500 + Math.random() * 1000);
-            const pending = retryQueue;
+            // Give the gateway a moment to come back, then retry in quieter
+            // passes. Real exports showed 39 of 66 Letterboxd→IMDb rows and 45
+            // of 68 Kinopoisk→IMDb rows failing on a write that WAS resolved:
+            // the resolver had just hammered the same host, so the first retry
+            // at full-ish concurrency ran straight into the same throttle.
+            // Two passes, each slower than the last, cost a few seconds and
+            // recover a large share of those ratings.
+            let pending = retryQueue;
             retryQueue = [];
-            Object.assign(gqlProbe, makeProbe(8, PLATFORM_MAX.imdb));
-            await applySlice(pending, true);
+            const passes = [
+                { pause: 2000, concurrency: 8 },
+                { pause: 6000, concurrency: 4 },
+            ];
+            for (let p = 0; p < passes.length && pending.length; p++) {
+                chApply(`${t('lblApply')} ↻ ${pending.length}`, { extra: `↻ ${pending.length}` });
+                await sleep(passes[p].pause + Math.random() * 800);
+                Object.assign(gqlProbe, makeProbe(passes[p].concurrency, 20));
+                await applySlice(pending, true);
+                pending = retryQueue;
+                retryQueue = [];
+            }
+            // Whatever still failed to reach IMDb becomes a visible miss with
+            // its own error text, instead of silently vanishing.
+            for (const entry of pending) {
+                fa++;
+                missed.push({ ...entry.item, error: t('errorApi') });
+            }
         }
         if (toApply.length) chApply(`${toApply.length}/${toApply.length}`, { current: toApply.length, total: toApply.length });
         finishChannel(statusEl, 'imdbApply', fa === 0, true);
@@ -4930,8 +4973,12 @@
                         return Promise.resolve({ slug: knownSlug, filmId: null, lid: null, score: 1.0, confidence: 'high', filmIdKey: i.filmIdKey ?? null, ttIdKey: i.ttIdKey ?? null });
                     }
                 }
-                // Direct slug match (valid URL slug or film: ID)
-                if (i.lbSlug && !deep) {
+                // Direct slug match (valid URL slug or film: ID). This must not
+                // depend on `deep`: the slug came verbatim from the source
+                // export, so it is the most exact evidence a row can carry, and
+                // throwing it away in Hard Import only bought a slower search
+                // with a chance of landing on a different film.
+                if (i.lbSlug) {
                     // Handle film:ID format (resolved later) and tv:slug format (used directly)
                     const filmIdMatch = i.lbSlug.match(/^film:(\d+)$/);
                     const tvSlugMatch = i.lbSlug.match(/^tv:(.+)$/);
@@ -5038,7 +5085,13 @@
         }
 
         // Phase 2: apply
-        Object.assign(lbProbe, makeProbe(25, PLATFORM_MAX.lb));
+        // Writes are not reads: 25–50 concurrent form posts to Letterboxd make
+        // the site answer 429 on a share of them, and those rows were reported
+        // as "API error / network failure" although nothing was wrong with the
+        // match. Twelve in flight keeps the whole run fast (a rating post is
+        // ~100–200 ms) and stays inside the tolerance Letterboxd shows for
+        // ordinary user actions.
+        Object.assign(lbProbe, makeProbe(12, 24));
         // `existing` was loaded before phase 1 so that search could be skipped,
         // and `toApply` was decided before the id prefetch for the same reason.
 
