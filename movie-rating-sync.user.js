@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.5
+// @version      1.6
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -365,6 +365,7 @@
         clearInterval(el.__statusTimer); el.__statusTimer = null;
         el.__titleText = null;
         el.__statusStart = null;
+        el.__lastChannel = null;
         el.textContent = '';
         el.style.display = 'none';
         el.__progressBar = null;
@@ -505,6 +506,9 @@
         el.style.display = 'block';
         const row = channelRow(el, channel, label);
         if (!row) return;
+        // Remember the row that is in flight: if a phase throws, the error
+        // report marks THIS row instead of only showing a bare message.
+        el.__lastChannel = channel;
         const hasProgress = !!(progress && progress.total > 0);
         // `extra` is the muted tail after the separator: the found-item count,
         // a checkmark tally, or '' for "no tail". Passing no `extra` with a
@@ -637,6 +641,32 @@
         bar.style.width = '100%';
         progress.appendChild(bar);
         el.appendChild(progress);
+    }
+
+    // A thrown error becomes a readable error card: title = message, and the
+    // phase rows already drawn stay on screen with the in-flight one marked `!`.
+    // Without this a ReferenceError showed only "❌ p is not defined" on an
+    // otherwise empty card, giving no clue which flow died.
+    function renderError(el, err, elapsedMs) {
+        if (!el) return;
+        const message = err && err.message != null ? String(err.message) : String(err);
+        const channel = el.__lastChannel;
+        if (channel) finishChannel(el, channel, false);
+        ensureStatusShell(el);
+        setTitle(el, '❌ ' + message);
+        // Stop the clock: this card is final, not a run in progress.
+        if (el.__timerInterval) { clearInterval(el.__timerInterval); el.__timerInterval = null; }
+        clearInterval(el.__statusTimer); el.__statusTimer = null;
+        const header = el.querySelector('.mrs-status__header');
+        if (header) header.classList.add('mrs-status__header--fail');
+        const timer = el.querySelector('.mrs-status__timer');
+        if (timer) timer.textContent = elapsedMs != null ? `${t('time')}${formatElapsed(elapsedMs)}` : '';
+        if (err && err.stack) console.error('[mrs] run failed:', err);
+    }
+
+    function reportRunError(el, err, elapsedMs) {
+        try { renderError(el, err, elapsedMs); }
+        catch (e2) { console.warn('[mrs] could not render the error card:', e2?.message ?? e2); }
     }
 
     // ====================== CSV ======================
@@ -2191,8 +2221,12 @@
             });
             btn.addEventListener('click', async () => {
                 beginRun(statusEl, t('deepSearch', { platform: 'Kinopoisk' }));
-                const r2 = await runKPImportBatch(result.missed, statusEl, mode, true, getImportOptions());
-                renderKPResult(r2, statusEl, mode);
+                const t0 = Date.now();
+                try {
+                    const r2 = await runKPImportBatch(result.missed, statusEl, mode, true, getImportOptions());
+                    r2.elapsedMs = Date.now() - t0;
+                    renderKPResult(r2, statusEl, mode);
+                } catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
             });
             const btnWrap = document.createElement('div');
             btnWrap.style.padding = '0 18px 14px';
@@ -3111,8 +3145,12 @@
             });
             btn.addEventListener('click', async () => {
                 beginRun(statusEl, t('deepSearch', { platform: 'IMDb' }));
-                const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode, getImportOptions());
-                renderIMDbResult(r2, statusEl, rated, watched, mode);
+                const t0 = Date.now();
+                try {
+                    const r2 = await imdbProcess(result.missed, rated, watched, statusEl, true, mode, getImportOptions());
+                    r2.elapsedMs = Date.now() - t0;
+                    renderIMDbResult(r2, statusEl, rated, watched, mode);
+                } catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
             });
             const btnWrap = document.createElement('div');
             btnWrap.style.padding = '0 18px 14px';
@@ -3156,6 +3194,7 @@
             // Track the last page that actually answered instead.
             let lastPage = 0;
             for (let p = 1; p <= RETRY.PAGES; p++) {
+                lastPage = p;
                 write(`${t('page')} ${p}`, { extra: `${items.length} ${t('movies')}` });
                 const nd = await fetchNextData(urlFn(uid, p));
                 if (!nd) break;
@@ -4771,7 +4810,9 @@
             });
             btn.addEventListener('click', async () => {
                 beginRun(statusEl, t('deepSearch', { platform: 'Letterboxd' }));
-                await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions());
+                const t0 = Date.now();
+                try { await performLBImport(buildCSV(result.missed), statusEl, mode, true, getImportOptions()); }
+                catch (err) { reportRunError(statusEl, err, Date.now() - t0); }
             });
             const btnWrap = document.createElement('div');
             btnWrap.style.padding = '0 18px 14px';
@@ -4840,6 +4881,8 @@
         .mrs-status__title{color:var(--mrs-fg-strong);font-weight:600;text-shadow:none;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
         .mrs-status__timer{margin-left:auto;color:var(--mrs-muted);font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:2px}
         .mrs-status__header--result{align-items:center;gap:8px;border-bottom:none}
+        .mrs-status__header--fail .mrs-pulse{background:var(--mrs-fail);animation:none}
+        .mrs-status__header--fail .mrs-status__title{color:var(--mrs-fail-fg)}
         .mrs-status__channels{display:flex;flex-direction:column;gap:4px;padding:8px 22px 12px;color:var(--mrs-fg)}
         .mrs-status__row{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:12px;line-height:1.5;color:var(--mrs-fg);padding-top:1px}
         .mrs-status__row-label{flex:0 0 auto;color:var(--mrs-fg-strong);font-weight:600;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -4957,7 +5000,7 @@
                         renderResult(statusEl, t('exportDone'), [], null, Date.now() - exportStart);
                     }
                 } catch (e) {
-                    renderResult(statusEl, '❌ ' + (e.message ?? String(e)), [], null, Date.now() - exportStart);
+                    reportRunError(statusEl, e, Date.now() - exportStart);
                 } finally { setDisabled(false); }
             });
 
@@ -4975,7 +5018,9 @@
                 buildUI._collapsePanel?.();
                 clearStatus(statusEl);
                 statusEl.style.display = 'block';
+                const importStart = Date.now();
                 try { await mod.import(await file.text(), statusEl, mode, false, getImportOptions()); }
+                catch (err) { reportRunError(statusEl, err, Date.now() - importStart); }
                 finally { setDisabled(false); }
             });
 
