@@ -58,6 +58,14 @@ ok('content.js ships the GM_* shim', () => {
     assert(content.includes('__mrsExtHook'), 'shim does not talk to the bootstrap hook');
 });
 
+ok('same-origin writes bypass the background proxy', () => {
+    // Letterboxd's rate/watch/like endpoints validate Origin/Referer, which a
+    // background fetch cannot carry. Those calls must go through the page.
+    assert(content.includes('isSameOrigin('), 'shim does not separate same-origin requests');
+    assert(/credentials: '?(same-origin)?'/.test(content), 'page-side fetch does not send the session cookie');
+    assert(content.includes('viaPage('), 'shim has no page-side fetch path');
+});
+
 // ---- 3. manifests ----------------------------------------------------------
 ok('manifests carry the userscript version', () => {
     assert.strictEqual(manifest.version, version, 'manifest.json version is stale');

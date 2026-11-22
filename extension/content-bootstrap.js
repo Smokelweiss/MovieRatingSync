@@ -128,7 +128,11 @@
             let changed = false;
             for (const [key, value] of Object.entries(all)) {
                 if (!isOwnKey(key)) continue;
-                if (mirror.read(key) === undefined) {
+                // chrome.storage is authoritative: the mirror is per-origin, so a
+                // setting changed on kinopoisk.ru would otherwise stay stale on
+                // imdb.com forever (the mirror there already holds an old copy).
+                // Compare serialised values — objects never compare equal by !==.
+                if (JSON.stringify(mirror.read(key)) !== JSON.stringify(value)) {
                     mirror.write(key, value);
                     changed = true;
                 }

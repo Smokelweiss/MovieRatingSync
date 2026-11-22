@@ -21,24 +21,91 @@
         (document.head || document.documentElement).appendChild(style);
         return style;
     };
+
+    // A request to the page's own origin is issued by the content script itself.
+    // The browser then attaches the session cookies and generates Origin/Referer,
+    // which the write endpoints (Letterboxd rate / watch / like) validate. The
+    // background proxy runs in the extension origin, so fetch there strips those
+    // headers and the site would answer 403 instead of saving the rating.
+    function isSameOrigin(url) {
+        try { return new URL(url, location.href).origin === location.origin; }
+        catch (e) { return false; }
+    }
+
+    function headersToRaw(h) {
+        var out = '';
+        var CRLF = String.fromCharCode(13) + String.fromCharCode(10);
+        if (h && typeof h.forEach === 'function') {
+            h.forEach(function (value, key) { out += key + ': ' + value + CRLF; });
+        }
+        return out;
+    }
+
+    function viaPage(details, deliver) {
+        var timeout = Number(details.timeout) > 0 ? Number(details.timeout) : 15000;
+        var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+        var settled = false;
+        var finish = function (res) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(tid);
+            deliver(res);
+        };
+        var tid = setTimeout(function () {
+            if (ctrl) { try { ctrl.abort(); } catch (e) { /* ignore */ } }
+            finish({ status: 0, statusText: '', responseHeaders: '', responseText: '', error: 'Timeout after ' + timeout + 'ms' });
+        }, timeout);
+        var method = details.method || 'GET';
+        var init = {
+            method: method,
+            credentials: 'same-origin',
+            headers: details.headers || {},
+        };
+        if (details.data != null && method !== 'GET' && method !== 'HEAD') init.body = details.data;
+        if (ctrl) init.signal = ctrl.signal;
+        fetch(details.url, init).then(function (r) {
+            return r.text().then(function (text) { return { r: r, text: text }; });
+        }).then(function (out) {
+            finish({
+                status: out.r.status,
+                statusText: out.r.statusText || '',
+                responseHeaders: headersToRaw(out.r.headers),
+                responseText: out.text,
+                finalUrl: out.r.url,
+            });
+        }, function (e) {
+            finish({ status: 0, statusText: '', responseHeaders: '', responseText: '', error: String((e && e.message) || e) });
+        });
+    }
+
+    function deliver(details) {
+        return function (r) {
+            var res = {
+                status: r.status,
+                statusText: r.statusText,
+                responseHeaders: r.responseHeaders,
+                responseText: r.responseText,
+                finalUrl: r.finalUrl,
+            };
+            if (r.error && !(r.status > 0)) {
+                res.error = r.error;
+                if (typeof details.onerror === 'function') details.onerror(res);
+            } else if (typeof details.onload === 'function') {
+                details.onload(res);
+            }
+        };
+    }
+
     window.GM = {
         xmlHttpRequest: function (details) {
-            hook.request(details).then(function (r) {
-                var res = {
-                    status: r.status,
-                    statusText: r.statusText,
-                    responseHeaders: r.responseHeaders,
-                    responseText: r.responseText,
-                    finalUrl: r.finalUrl,
-                };
-                if (r.error) {
-                    if (typeof details.onerror === 'function') details.onerror(res);
-                } else if (typeof details.onload === 'function') {
-                    details.onload(res);
+            if (isSameOrigin(details.url)) {
+                viaPage(details, deliver(details));
+                return;
+            }
+            hook.request(details).then(deliver(details), function (e) {
+                if (typeof details.onerror === 'function') {
+                    details.onerror({ status: 0, statusText: '', responseHeaders: '', responseText: '', error: String((e && e.message) || e) });
                 }
-            }, function (e) {
-                var res = { status: 0, statusText: '', responseHeaders: '', responseText: '', error: String((e && e.message) || e) };
-                if (typeof details.onerror === 'function') details.onerror(res);
             });
         },
     };
