@@ -2,7 +2,7 @@
 // @name         Movie Rating Sync
 // @name:ru      Синхронизация Кинооценок
 // @namespace    https://github.com/Smokelweiss
-// @version      1.10
+// @version      1.11
 // @description  Sync movie ratings across Kinopoisk, IMDb, Letterboxd and more
 // @description:ru Синхронизируйте оценки фильмов между Kinopoisk, IMDb и другими сервисами
 // @author       Smokelweiss
@@ -140,6 +140,18 @@
             }
         }
     }
+
+    // Extension mode only: settings arrive from chrome.storage asynchronously,
+    // so the interface may have started in the browser's language instead of
+    // the user's saved one. The bootstrap fires this once the mirror is ready.
+    try {
+        window.addEventListener('mrs-gm-hydrated', () => {
+            const saved = (() => {
+                try { return GM_getValue('mrs_lang', null); } catch (e) { return null; }
+            })();
+            if (saved && saved !== __locale && TRANSLATIONS[saved]) applyLocale(saved);
+        });
+    } catch (e) { /* non-browser context */ }
 
     // ====================== UTILITIES ======================
 
@@ -2645,6 +2657,12 @@
   }
 }`;
 
+    // Verified from the shell: api.graphql.imdb.com answers every request — even
+    // a plain read — with a CloudFront 403 unless this header is present. It is
+    // what the real imdb.com frontend sends; without it a whole import could
+    // fail with nothing but "API error / network failure".
+    const IMDB_CLIENT_HEADERS = { 'x-imdb-client-name': 'imdb-web-next' };
+
     async function imdbGql(query, variables) {
         // Returns the parsed JSON body on success. On a transport failure
         // (timeout, network error, CDN block, gateway 5xx) it returns
@@ -2664,6 +2682,7 @@
                         'Content-Type': 'application/json',
                         'Origin': 'https://www.imdb.com',
                         'Referer': 'https://www.imdb.com/',
+                        ...IMDB_CLIENT_HEADERS,
                     },
                     credentials: 'include',
                     body: JSON.stringify({ query, variables }),
@@ -3423,7 +3442,17 @@
                 if (i.ttId && /^tt\d+$/.test(i.ttId)) {
                     result = { ttId: i.ttId, score: 1.0, confidence: 'high' };
                 } else {
-                    result = await withTimeout(resolveIMDb(i.title, i.year, deep, i.allTitles || [], i), itemBudget, null);
+                    // A Letterboxd row carries its slug, and the film page states
+                    // the IMDb id in its footer. That is an exact bridge: it
+                    // skips the title search entirely and cannot land on a
+                    // namesake. Falls back to the title search when the page
+                    // has no IMDb link (documentaries, video releases).
+                    let bridged = null;
+                    if (i.lbSlug) {
+                        const tt = await lbSlugToImdbId(i.lbSlug, null).catch(() => null);
+                        if (tt) bridged = { ttId: tt, score: 1.0, confidence: 'high' };
+                    }
+                    result = bridged ?? await withTimeout(resolveIMDb(i.title, i.year, deep, i.allTitles || [], i), itemBudget, null);
                 }
                 done++;
                 if (result?.ttId && result.confidence !== 'low') found++;
@@ -3576,7 +3605,7 @@
         const results = await Promise.allSettled(batches.map(batch =>
             fetchT(IMDB_GQL, 30000, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Origin': 'https://www.imdb.com', 'Referer': 'https://www.imdb.com/' },
+                headers: { 'Content-Type': 'application/json', 'Origin': 'https://www.imdb.com', 'Referer': 'https://www.imdb.com/', ...IMDB_CLIENT_HEADERS },
                 credentials: 'include',
                 body: JSON.stringify({
                     operationName: 'PersonalizedUserData',
@@ -4611,6 +4640,46 @@
             || html.match(/data-film-slug="([^"]+)"/)?.[1]
             || null;
         return (lid || filmId) ? { lid, filmId, slug } : null;
+    }
+
+    // Reverse bridge: a Letterboxd film page names its IMDb title in the footer
+    // link ("More at imdb.com/title/tt0074285/maindetails"). Verified against
+    // the user's last Letterboxd→IMDb export: 52 of 68 missed rows carry the id
+    // right there, so one page fetch replaces a title search — and an exact id
+    // is the strongest match evidence there is, which is what keeps that
+    // direction from writing a rating onto a namesake film.
+    function lbImdbIdFromPage(html) {
+        if (!html) return null;
+        const m = html.match(/imdb\.com\/title\/(tt\d+)/)
+            || html.match(/data-imdb-id="(tt\d+)"/);
+        return m ? m[1] : null;
+    }
+
+    async function lbSlugToImdbId(lbSlug, csrfRef) {
+        if (!lbSlug) return null;
+        const raw = String(lbSlug).trim();
+        // `film:123` and `tv:slug` are both ids for Letterboxd, but only a slug
+        // can be fetched without a second lookup.
+        if (!raw || /^film:\d+$/i.test(raw)) return null;
+        const isTv = raw.startsWith('tv:');
+        const slug = isTv ? raw.slice(3) : raw;
+        const cacheKey = `lbImdbRev:${raw}`;
+        const cached = searchCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+        const negTs = _lbNeg.get(cacheKey);
+        if (negTs && Date.now() - negTs < SEARCH_NEG_TTL) return null;
+        return dedupeFetch(cacheKey, async () => {
+            const html = await fetchLBHtml(`https://letterboxd.com/${isTv ? 'tv' : 'film'}/${slug}/`);
+            if (!html) return null;
+            if (csrfRef) {
+                const csrfInPage = html.match(/supermodelCSRF\s*=\s*['"]([^'"]+)['"]/);
+                if (csrfInPage) csrfRef.val = csrfInPage[1];
+            }
+            const tt = lbImdbIdFromPage(html);
+            if (!tt) { _lbNeg.set(cacheKey, Date.now()); return null; }
+            searchCache.set(cacheKey, tt);
+            return tt;
+        });
     }
 
     // Resolve a film by its IMDb id. Letterboxd redirects /imdb/tt…/ to the

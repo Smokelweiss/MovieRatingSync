@@ -1,0 +1,118 @@
+name: Release
+
+# Tag-driven releases: push a tag (v1.11, v1.12 …) and this workflow packages
+# both builds, publishes the Firefox one to AMO and attaches the artifacts to a
+# GitHub release. Pushing to `main` alone never publishes anything.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      ADDON_ID: movie-ratings-sync@smokelweiss
+      AMO_API: https://addons.mozilla.org/api/v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Read the version from the userscript header
+        id: version
+        run: |
+          VER=$(grep -m1 '// @version' movie-rating-sync.user.js | sed -E 's/.*@version\s+([0-9.]+).*/\1/')
+          test -n "$VER" || { echo "no @version in the userscript"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "version: $VER"
+
+      - name: Refuse to publish a tag that disagrees with the script
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$TAG" != "${{ steps.version.outputs.version }}" ]; then
+            echo "Tag $TAG does not match @version ${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Rebuild the extension from the userscript
+        run: node tools/build-extension.js
+
+      - name: Verify the artifacts
+        run: |
+          node tests/extension-build.test.js
+          node tests/i18n.test.js
+          node tests/match-guards.test.js
+          node tests/pure-functions.test.js
+          node tests/title-key.test.js
+
+      - name: Assemble both builds
+        run: |
+          # Firefox is MV2, Chrome/Edge is MV3, so each build is assembled from
+          # its own manifest instead of zipping the source folder.
+          rm -rf _ff _crx
+          mkdir -p _ff/icons _crx/icons
+          cp extension/content.js extension/content-bootstrap.js extension/background.js _ff/
+          cp extension/manifest.firefox.json _ff/manifest.json
+          cp extension/icons/*.png _ff/icons/
+
+          cp extension/content.js extension/content-bootstrap.js extension/background.js _crx/
+          cp extension/manifest.json _crx/manifest.json
+          cp extension/icons/*.png _crx/icons/
+
+      - name: Lint the Firefox build
+        run: npx --yes web-ext@8 lint --source-dir _ff --output text
+        continue-on-error: true
+
+      - name: Zip both builds
+        run: |
+          (cd _ff && zip -qr ../movie-ratings-sync-firefox.zip .)
+          (cd _crx && zip -qr ../movie-ratings-sync-chrome.zip .)
+          rm -rf _ff _crx
+          ls -l movie-ratings-sync-*.zip
+
+      - name: Skip if AMO already has this version
+        id: amo_check
+        run: |
+          VERSIONS=$(curl -sf "$AMO_API/addons/addon/$ADDON_ID/versions/?page_size=50") || VERSIONS=''
+          if printf '%s' "$VERSIONS" | grep -q "\"version\":\"${{ steps.version.outputs.version }}\""; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "AMO already has ${{ steps.version.outputs.version }} — not uploading again"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to Firefox AMO
+        if: steps.amo_check.outputs.exists == 'false'
+        uses: wdzeng/firefox-addon@v1
+        with:
+          addon-id: ${{ env.ADDON_ID }}
+          jwt-issuer: ${{ secrets.AMO_JWT_ISSUER }}
+          jwt-secret: ${{ secrets.AMO_JWT_SECRET }}
+          path: movie-ratings-sync-firefox.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            movie-ratings-sync-firefox.zip
+            movie-ratings-sync-chrome.zip
+            movie-rating-sync.user.js
+          generate_release_notes: true
+          fail_on_unmatched_files: true
