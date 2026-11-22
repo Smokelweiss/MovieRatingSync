@@ -105,10 +105,10 @@ jobs:
         if: steps.amo_check.outputs.exists == 'false'
         uses: wdzeng/firefox-addon@v1
         with:
-          addon-id: ${{ env.ADDON_ID }}
+          addon-guid: ${{ env.ADDON_ID }}
           jwt-issuer: ${{ secrets.AMO_JWT_ISSUER }}
           jwt-secret: ${{ secrets.AMO_JWT_SECRET }}
-          path: movie-ratings-sync-firefox.zip
+          xpi-path: movie-ratings-sync-firefox.zip
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
