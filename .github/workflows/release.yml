@@ -87,14 +87,19 @@ jobs:
 
       - name: Skip if AMO already has this version
         id: amo_check
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: |
-          VERSIONS=$(curl -sf "$AMO_API/addons/addon/$ADDON_ID/versions/?page_size=50") || VERSIONS=''
-          if printf '%s' "$VERSIONS" | grep -q "\"version\":\"${{ steps.version.outputs.version }}\""; then
+          # The public API hides unreviewed uploads, so the check has to be
+          # authenticated; tools/amo-check.js signs the same JWT as the action.
+          RESULT=$(node tools/amo-check.js "$ADDON_ID" "${{ steps.version.outputs.version }}")
+          if printf '%s' "$RESULT" | grep -q 'exists'; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "AMO already has ${{ steps.version.outputs.version }} — not uploading again"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+          printf '%s\n' "$RESULT"
 
       - name: Publish to Firefox AMO
         if: steps.amo_check.outputs.exists == 'false'
