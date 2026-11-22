@@ -62,8 +62,9 @@ ok('same-origin writes bypass the background proxy', () => {
     // Letterboxd's rate/watch/like endpoints validate Origin/Referer, which a
     // background fetch cannot carry. Those calls must go through the page.
     assert(content.includes('isSameOrigin('), 'shim does not separate same-origin requests');
-    assert(/credentials: '?(same-origin)?'/.test(content), 'page-side fetch does not send the session cookie');
+    assert(content.includes("credentials: 'same-origin'"), 'page-side fetch does not send the session cookie');
     assert(content.includes('viaPage('), 'shim has no page-side fetch path');
+    assert(content.includes('hook.request(details)'), 'cross-origin requests no longer use the proxy');
 });
 
 // ---- 3. manifests ----------------------------------------------------------
