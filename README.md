@@ -96,7 +96,7 @@ The userscript is the single source of truth; the extension is generated from it
 * `node tests/matcher-harness.js` — dry-run matcher over the real CSVs in the repo; use `--limit`, `--filter`, `--trace`.
 * Manual checklist: [`MANUAL_TEST_GUIDE.md`](MANUAL_TEST_GUIDE.md).
 
-Releases: pushing a new `@version` to `main` triggers `.github/workflows/release.yml`, which builds the Firefox package, publishes it to Mozilla Add-ons and creates a tagged GitHub release.
+Releases: pushing a tag (`v1.11`, `v1.12` …) runs `.github/workflows/release.yml`, which rebuilds both builds, publishes the Firefox package to Mozilla Add-ons and attaches all artifacts to a tagged GitHub release.
 
 ## Privacy
 

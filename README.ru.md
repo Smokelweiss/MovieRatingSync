@@ -96,7 +96,7 @@ Userscript — единственный источник правды, расш�
 * `node tests/matcher-harness.js` — прогон сопоставления по реальным CSV в репозитории; флаги `--limit`, `--filter`, `--trace`.
 * Ручной чек-лист: [`MANUAL_TEST_GUIDE.md`](MANUAL_TEST_GUIDE.md).
 
-Релизы: пуш новой версии `@version` в `main` запускает `.github/workflows/release.yml` — он собирает пакет для Firefox, публикует его в Mozilla Add-ons и создаёт GitHub-релиз с тегом.
+Релизы: пуш тега (`v1.11`, `v1.12` …) запускает `.github/workflows/release.yml` — он пересобирает обе сборки, публикует пакет для Firefox в Mozilla Add-ons и прикладывает все артефакты к GitHub-релизу с тегом.
 
 ## Приватность
 
